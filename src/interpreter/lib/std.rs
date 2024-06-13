@@ -256,7 +256,7 @@ pub fn std() -> HashMap<String, Value> {
             async move {
                 let mut args = args.into_iter();
                 let v = expect_any(args.next())?;
-                Ok(Value::str(v.value.display_type().to_string()))
+                Ok(Value::str(v.display_type().to_string()))
             }
             .boxed()
         }),
@@ -268,7 +268,7 @@ pub fn std() -> HashMap<String, Value> {
             async move {
                 let mut args = args.into_iter();
                 let v = expect_any(args.next())?;
-                Ok(Value::str(v.value.repr_value().to_string()))
+                Ok(Value::str(v.repr_value().to_string()))
             }
             .boxed()
         }),
@@ -1097,7 +1097,7 @@ pub fn std() -> HashMap<String, Value> {
             async move {
                 let mut args = args.into_iter();
                 let seed = expect_any(args.next())?;
-                Ok(match seed.value {
+                Ok(match *seed.value {
                     V::Num(num) => Some(num.to_string()),
                     V::Str(str) => Some(str),
                     _ => None,
@@ -1215,7 +1215,7 @@ pub fn std() -> HashMap<String, Value> {
                 let codepoints = <Vec<Value>>::try_from(args.next().unwrap_or_default())?;
                 let mut s = String::new();
                 for codepoint in codepoints {
-                    let codepoint = f64::try_from(codepoint.value)?;
+                    let codepoint = f64::try_from(codepoint)?;
                     s += char::from_u32(codepoint as u32)
                         .map_or_else(
                             || {

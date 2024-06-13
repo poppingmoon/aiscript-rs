@@ -370,7 +370,7 @@ impl Interpreter {
                                 None,
                             );
                             let v = self.eval(*for_.clone(), &scope).await?;
-                            match v.value {
+                            match *v.value {
                                 V::Break => {
                                     break;
                                 }
@@ -396,7 +396,7 @@ impl Interpreter {
                             let mut i = 0.0;
                             while i < times {
                                 let v = self.eval(*for_.clone(), scope).await?;
-                                match v.value {
+                                match *v.value {
                                     V::Break => {
                                         break;
                                     }
@@ -422,7 +422,7 @@ impl Interpreter {
                                     None,
                                 );
                                 let v = self.eval(*for_.clone(), &scope).await?;
-                                match v.value {
+                                match *v.value {
                                     V::Break => {
                                         break;
                                     }
@@ -443,7 +443,7 @@ impl Interpreter {
                                 &scope.create_child_scope(HashMap::new(), None),
                             )
                             .await?;
-                        match v.value {
+                        match *v.value {
                             V::Break => {
                                 break Value::null();
                             }
@@ -569,10 +569,10 @@ impl Interpreter {
                             value: left_value,
                             attr,
                         } = self.eval(*left, scope).await?;
-                        let left_value = bool::try_from(left_value)?;
+                        let left_value = bool::try_from(*left_value)?;
                         if !left_value {
                             Value {
-                                value: V::Bool(left_value),
+                                value: Box::new(V::Bool(left_value)),
                                 attr,
                             }
                         } else {
@@ -580,9 +580,9 @@ impl Interpreter {
                                 value: right_value,
                                 attr,
                             } = self.eval(*right, scope).await?;
-                            let right_value = bool::try_from(right_value)?;
+                            let right_value = bool::try_from(*right_value)?;
                             Value {
-                                value: V::Bool(right_value),
+                                value: Box::new(V::Bool(right_value)),
                                 attr,
                             }
                         }
@@ -592,10 +592,10 @@ impl Interpreter {
                             value: left_value,
                             attr,
                         } = self.eval(*left, scope).await?;
-                        let left_value = bool::try_from(left_value)?;
+                        let left_value = bool::try_from(*left_value)?;
                         if left_value {
                             Value {
-                                value: V::Bool(left_value),
+                                value: Box::new(V::Bool(left_value)),
                                 attr,
                             }
                         } else {
@@ -603,9 +603,9 @@ impl Interpreter {
                                 value: right_value,
                                 attr,
                             } = self.eval(*right, scope).await?;
-                            let right_value = bool::try_from(right_value)?;
+                            let right_value = bool::try_from(*right_value)?;
                             Value {
-                                value: V::Bool(right_value),
+                                value: Box::new(V::Bool(right_value)),
                                 attr,
                             }
                         }
@@ -624,7 +624,7 @@ impl Interpreter {
                     ast::Expression::Index(ast::Index { target, index, .. }) => {
                         let target = self.eval(*target, scope).await?;
                         let i = self.eval(*index, scope).await?;
-                        match target.value {
+                        match *target.value {
                             V::Arr(arr) => {
                                 let i = f64::try_from(i)?;
                                 let item = if i.trunc() == i {
@@ -658,7 +658,7 @@ impl Interpreter {
                     }
                     ast::Expression::Prop(ast::Prop { target, name, .. }) => {
                         let value = self.eval(*target.clone(), scope).await?;
-                        if let V::Obj(value) = value.value {
+                        if let V::Obj(value) = *value.value {
                             if let Some(value) = value.read().unwrap().get(&name) {
                                 value.clone()
                             } else {
@@ -682,7 +682,7 @@ impl Interpreter {
         let mut v = Value::null();
         for node in program {
             v = self.eval(node, scope).await?;
-            if let V::Return(_) | V::Break | V::Continue = v.value {
+            if let V::Return(_) | V::Break | V::Continue = *v.value {
                 return Ok(v);
             }
         }
@@ -715,7 +715,7 @@ impl Interpreter {
                 ast::Expression::Index(ast::Index { target, index, .. }) => {
                     let assignee = self.eval(*target.clone(), scope).await?;
                     let i = self.eval(*index, scope).await?;
-                    match assignee.value {
+                    match *assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
                             if i.trunc() == i && arr.read().unwrap().get(i as usize).is_some() {
@@ -740,7 +740,7 @@ impl Interpreter {
                 }
                 ast::Expression::Prop(ast::Prop { target, name, .. }) => {
                     let assignee = self.eval(*target.clone(), scope).await?;
-                    let assignee = VObj::try_from(assignee.value)?;
+                    let assignee = VObj::try_from(assignee)?;
                     assignee.write().unwrap().insert(name, value);
                 }
                 ast::Expression::Arr(ast::Arr { value: target, .. }) => {
@@ -751,7 +751,7 @@ impl Interpreter {
                     .await?;
                 }
                 ast::Expression::Obj(ast::Obj { value: target, .. }) => {
-                    let value = <IndexMap<String, Value>>::try_from(value.value)?;
+                    let value = <IndexMap<String, Value>>::try_from(value)?;
                     try_join_all(target.into_iter().map(|(key, item)| {
                         self.assign(scope, item, value.get(&key).cloned().unwrap_or_default())
                     }))

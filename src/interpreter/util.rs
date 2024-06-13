@@ -40,7 +40,7 @@ impl TryFrom<Value> for bool {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -63,7 +63,7 @@ impl TryFrom<Value> for VFn {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -86,7 +86,7 @@ impl TryFrom<Value> for String {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -109,7 +109,7 @@ impl TryFrom<Value> for f64 {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -132,7 +132,7 @@ impl TryFrom<Value> for VObj {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -148,7 +148,7 @@ impl TryFrom<Value> for IndexMap<String, Value> {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -171,7 +171,7 @@ impl TryFrom<Value> for VArr {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -187,7 +187,7 @@ impl TryFrom<Value> for Vec<Value> {
     type Error = AiScriptError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        value.value.try_into()
+        (*value.value).try_into()
     }
 }
 
@@ -340,7 +340,7 @@ impl Serialize for VWithMemo {
                     let mut seq = serializer.serialize_seq(Some(value.len()))?;
                     for e in value.iter() {
                         seq.serialize_element(&VWithMemo {
-                            value: e.value.clone(),
+                            value: *e.value.clone(),
                             processed_arrays: processed_arrays.clone(),
                             processed_objects: self.processed_objects.clone(),
                         })?;
@@ -361,7 +361,7 @@ impl Serialize for VWithMemo {
                         map.serialize_entry(
                             k,
                             &VWithMemo {
-                                value: v.value.clone(),
+                                value: *v.value.clone(),
                                 processed_arrays: self.processed_arrays.clone(),
                                 processed_objects: processed_objects.clone(),
                             },

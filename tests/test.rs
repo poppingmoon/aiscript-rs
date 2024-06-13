@@ -5025,7 +5025,7 @@ mod std {
             .unwrap();
 
             test("<: Math:sin(Math:PI / 4) * Math:cos(Math:PI / 4)", |res| {
-                assert!((f64::try_from(res.value).unwrap() - 0.5).abs() <= f64::EPSILON)
+                assert!((f64::try_from(res).unwrap() - 0.5).abs() <= f64::EPSILON)
             })
             .await
             .unwrap();

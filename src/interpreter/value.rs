@@ -101,20 +101,23 @@ pub struct Attr {
 
 #[derive(Clone, Debug, Default)]
 pub struct Value {
-    pub value: V,
+    pub value: Box<V>,
     pub attr: Option<Vec<Attr>>,
 }
 
 impl Value {
-    pub const fn new(value: V) -> Self {
-        Value { value, attr: None }
+    pub fn new(value: V) -> Self {
+        Value {
+            value: value.into(),
+            attr: None,
+        }
     }
 
-    pub const fn null() -> Self {
+    pub fn null() -> Self {
         Value::new(V::Null)
     }
 
-    pub const fn bool(value: bool) -> Self {
+    pub fn bool(value: bool) -> Self {
         Value::new(V::Bool(value))
     }
 
@@ -181,7 +184,7 @@ impl Value {
 }
 
 pub fn unwrap_ret(v: Value) -> Value {
-    if let V::Return(value) = v.value {
+    if let V::Return(value) = *v.value {
         *value
     } else {
         v

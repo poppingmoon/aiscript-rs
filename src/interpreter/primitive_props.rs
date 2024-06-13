@@ -15,7 +15,7 @@ use super::{
 };
 
 pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError> {
-    Ok(match target.value {
+    Ok(match *target.value {
         V::Num(target) => match name.as_str() {
             "to_str" => Value::fn_native(move |_, _| {
                 async move { Ok(Value::str(target.to_string())) }.boxed()
@@ -440,7 +440,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                         target
                             .iter()
                             .map(|i| {
-                                if let V::Str(value) = &i.value {
+                                if let V::Str(value) = &*i.value {
                                     value
                                 } else {
                                     ""
@@ -759,7 +759,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                                 return;
                             }
                             for v in arr {
-                                if let V::Arr(value) = v.value {
+                                if let V::Arr(value) = *v.value {
                                     flat(value.read().unwrap().clone(), depth - 1, result);
                                 } else {
                                     result.push(v);
@@ -787,7 +787,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                         .await?;
                     let mut result = Vec::new();
                     for value in mapped_vals {
-                        if let V::Arr(value) = value.value {
+                        if let V::Arr(value) = *value.value {
                             result.extend(value.read().unwrap().clone())
                         } else {
                             result.push(value)
