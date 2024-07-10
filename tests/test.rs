@@ -4897,6 +4897,120 @@ mod primitive_props {
             .await
             .unwrap();
         }
+
+        #[tokio::test]
+        async fn at_without_default_value() {
+            test(
+                r#"
+                let arr1 = [10, 20, 30]
+				<: [
+					arr1
+					arr1.at(0), arr1.at(1), arr1.at(2)
+					arr1.at(-3), arr1.at(-2), arr1.at(-1)
+					arr1.at(3), arr1.at(4), arr1.at(5)
+					arr1.at(-6), arr1.at(-5), arr1.at(-4)
+				]
+                "#,
+                |res| {
+                    assert_eq!(
+                        res,
+                        arr([
+                            arr([num(10), num(20), num(30)]),
+                            num(10),
+                            num(20),
+                            num(30),
+                            num(10),
+                            num(20),
+                            num(30),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                        ])
+                    )
+                },
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn at_with_default_value() {
+            test(
+                r#"
+                let arr1 = [10, 20, 30]
+				<: [
+					arr1
+					arr1.at(0, 100), arr1.at(1, 100), arr1.at(2, 100)
+					arr1.at(-3, 100), arr1.at(-2, 100), arr1.at(-1, 100)
+					arr1.at(3, 100), arr1.at(4, 100), arr1.at(5, 100)
+					arr1.at(-6, 100), arr1.at(-5, 100), arr1.at(-4, 100)
+				]
+                "#,
+                |res| {
+                    assert_eq!(
+                        res,
+                        arr([
+                            arr([num(10), num(20), num(30)]),
+                            num(10),
+                            num(20),
+                            num(30),
+                            num(10),
+                            num(20),
+                            num(30),
+                            num(100),
+                            num(100),
+                            num(100),
+                            num(100),
+                            num(100),
+                            num(100),
+                        ])
+                    )
+                },
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn at_fraction() {
+            test(
+                r#"
+                let arr1 = [10, 20, 30]
+				<: [
+					arr1
+					arr1.at(0.1), arr1.at(1.4), arr1.at(2.5)
+					arr1.at(-3.1), arr1.at(-2.4), arr1.at(-1.5)
+					arr1.at(3.1), arr1.at(4.4), arr1.at(5.5)
+					arr1.at(-6.1), arr1.at(-5.4), arr1.at(-4.5)
+				]
+                "#,
+                |res| {
+                    assert_eq!(
+                        res,
+                        arr([
+                            arr([num(10), num(20), num(30)]),
+                            num(10),
+                            num(20),
+                            num(30),
+                            num(10),
+                            num(20),
+                            num(30),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                            null(),
+                        ])
+                    )
+                },
+            )
+            .await
+            .unwrap();
+        }
     }
 }
 

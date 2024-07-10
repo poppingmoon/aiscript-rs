@@ -878,6 +878,26 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                 }
                 .boxed()
             }),
+            "at" => Value::fn_native(move |args, _| {
+                let target = target.clone();
+                let target_len = target.read().unwrap().len();
+                async move {
+                    let mut args = args.into_iter();
+                    let idx = f64::try_from(args.next().unwrap_or_default())? as isize;
+                    let index = if idx < 0 {
+                        target_len as isize + idx
+                    } else {
+                        idx
+                    };
+                    Ok(if index < 0 {
+                        None
+                    } else {
+                        target.read().unwrap().get(index as usize).cloned()
+                    }
+                    .unwrap_or_else(|| args.next().unwrap_or_default()))
+                }
+                .boxed()
+            }),
             _ => Err(AiScriptRuntimeError::Runtime(format!(
                 "No such prop ({name}) in string."
             )))?,
