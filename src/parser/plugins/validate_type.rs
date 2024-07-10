@@ -1,7 +1,7 @@
 use crate::{
     error::AiScriptError,
     parser::{node as cst, visit::Visitor},
-    r#type::get_type_by_source,
+    r#type::Type,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -17,7 +17,7 @@ impl Visitor for TypeValidator {
             ..
         }) = &statement
         {
-            get_type_by_source(var_type.clone())?;
+            Type::try_from(var_type.clone())?;
         };
         Ok(statement)
     }
@@ -31,7 +31,7 @@ impl Visitor for TypeValidator {
             ..
         }) = &expression
         {
-            get_type_by_source(ret_type.clone())?;
+            Type::try_from(ret_type.clone())?;
         };
         Ok(expression)
     }

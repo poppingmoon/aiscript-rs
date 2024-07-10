@@ -3,9 +3,9 @@ use std::fmt::Display;
 use crate::{error::AiScriptSyntaxError, node as ast};
 
 pub enum Type {
-    Simple(TSimple),
-    Generic(TGeneric),
-    Fn(TFn),
+    Simple,
+    Generic,
+    Fn,
 }
 
 impl Display for ast::NamedTypeSource {
@@ -42,32 +42,28 @@ impl Display for ast::TypeSource {
     }
 }
 
-pub fn get_type_by_source(type_source: ast::TypeSource) -> Result<Type, AiScriptSyntaxError> {
-    match type_source {
-        ast::TypeSource::NamedTypeSource(type_source) => match type_source.name.as_str() {
-            "null" | "bool" | "num" | "str" | "any" | "void" => Ok(Type::Simple(TSimple {
-                name: type_source.name,
-            })),
-            "arr" | "obj" => Ok(Type::Generic(TGeneric {
-                name: type_source.name,
-                inners: vec![type_source.inner.map_or_else(
-                    || {
-                        Ok(Type::Simple(TSimple {
-                            name: "any".to_string(),
-                        }))
-                    },
-                    |inner| get_type_by_source(*inner),
-                )?],
-            })),
-            _ => Err(AiScriptSyntaxError::UnknownType(type_source.to_string())),
-        },
-        ast::TypeSource::FnTypeSource(type_source) => Ok(Type::Fn(TFn {
-            args: type_source
-                .args
-                .into_iter()
-                .map(get_type_by_source)
-                .collect::<Result<Vec<Type>, AiScriptSyntaxError>>()?,
-            result: get_type_by_source(*type_source.result)?.into(),
-        })),
+impl TryFrom<ast::TypeSource> for Type {
+    type Error = AiScriptSyntaxError;
+
+    fn try_from(value: ast::TypeSource) -> Result<Self, Self::Error> {
+        match value {
+            ast::TypeSource::NamedTypeSource(type_source) => match type_source.name.as_str() {
+                "null" | "bool" | "num" | "str" | "any" | "void" => Ok(Type::Simple),
+                "arr" | "obj" => {
+                    if let Some(inner) = type_source.inner {
+                        Type::try_from(*inner)?;
+                    }
+                    Ok(Type::Generic)
+                }
+                _ => Err(AiScriptSyntaxError::UnknownType(type_source.to_string())),
+            },
+            ast::TypeSource::FnTypeSource(ast::FnTypeSource { args, result, .. }) => {
+                for arg in args {
+                    Type::try_from(arg)?;
+                }
+                Type::try_from(*result)?;
+                Ok(Type::Fn)
+            }
+        }
     }
 }
