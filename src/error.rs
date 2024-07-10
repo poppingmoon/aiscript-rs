@@ -20,6 +20,8 @@ pub enum AiScriptSyntaxError {
     Attribute,
     #[error(r#"Reserved word "{0}" cannot be used as variable name."#)]
     ReservedWord(String),
+    #[error("Unknown type: '{0}'")]
+    UnknownType(String),
 }
 
 #[derive(Error, Debug, PartialEq, Clone)]

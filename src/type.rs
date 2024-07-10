@@ -1,18 +1,6 @@
-use crate::{error::AiScriptError, node as ast};
+use std::fmt::Display;
 
-pub struct TSimple {
-    pub name: String,
-}
-
-pub struct TGeneric {
-    pub name: String,
-    pub inners: Vec<Type>,
-}
-
-pub struct TFn {
-    pub args: Vec<Type>,
-    pub result: Box<Type>,
-}
+use crate::{error::AiScriptSyntaxError, node as ast};
 
 pub enum Type {
     Simple(TSimple),
@@ -20,7 +8,41 @@ pub enum Type {
     Fn(TFn),
 }
 
-pub fn get_type_by_source(type_source: ast::TypeSource) -> Result<Type, AiScriptError> {
+impl Display for ast::NamedTypeSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ast::NamedTypeSource { name, inner, .. } = self;
+        write!(f, "{name}")?;
+        if let Some(inner) = inner {
+            write!(f, "<{inner}>")?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for ast::FnTypeSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let ast::FnTypeSource { args, result, .. } = self;
+        write!(
+            f,
+            "@({}) {{ {result} }}",
+            args.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<String>>()
+                .join(", ")
+        )
+    }
+}
+
+impl Display for ast::TypeSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ast::TypeSource::NamedTypeSource(type_source) => type_source.fmt(f),
+            ast::TypeSource::FnTypeSource(type_source) => type_source.fmt(f),
+        }
+    }
+}
+
+pub fn get_type_by_source(type_source: ast::TypeSource) -> Result<Type, AiScriptSyntaxError> {
     match type_source {
         ast::TypeSource::NamedTypeSource(type_source) => match type_source.name.as_str() {
             "null" | "bool" | "num" | "str" | "any" | "void" => Ok(Type::Simple(TSimple {
@@ -37,14 +59,14 @@ pub fn get_type_by_source(type_source: ast::TypeSource) -> Result<Type, AiScript
                     |inner| get_type_by_source(*inner),
                 )?],
             })),
-            _ => todo!(),
+            _ => Err(AiScriptSyntaxError::UnknownType(type_source.to_string())),
         },
         ast::TypeSource::FnTypeSource(type_source) => Ok(Type::Fn(TFn {
             args: type_source
                 .args
                 .into_iter()
                 .map(get_type_by_source)
-                .collect::<Result<Vec<Type>, AiScriptError>>()?,
+                .collect::<Result<Vec<Type>, AiScriptSyntaxError>>()?,
             result: get_type_by_source(*type_source.result)?.into(),
         })),
     }
