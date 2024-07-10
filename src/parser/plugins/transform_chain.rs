@@ -13,7 +13,19 @@ impl Visitor for ChainTransformer {
     ) -> Result<cst::Expression, AiScriptError> {
         // chain
         match &expression {
-            cst::Expression::Fn(cst::Fn_ {
+            cst::Expression::Not(cst::Not {
+                chain: Some(chain), ..
+            })
+            | cst::Expression::And(cst::And {
+                chain: Some(chain), ..
+            })
+            | cst::Expression::Or(cst::Or {
+                chain: Some(chain), ..
+            })
+            | cst::Expression::If(cst::If {
+                chain: Some(chain), ..
+            })
+            | cst::Expression::Fn(cst::Fn_ {
                 chain: Some(chain), ..
             })
             | cst::Expression::Match(cst::Match {
@@ -50,10 +62,22 @@ impl Visitor for ChainTransformer {
                 chain: Some(chain), ..
             }) => Ok(chain.iter().fold(
                 match &expression {
-                    cst::Expression::Not(not) => cst::Expression::Not(not.clone()),
-                    cst::Expression::And(and) => cst::Expression::And(and.clone()),
-                    cst::Expression::Or(or) => cst::Expression::Or(or.clone()),
-                    cst::Expression::If(if_) => cst::Expression::If(if_.clone()),
+                    cst::Expression::Not(not) => cst::Expression::Not(cst::Not {
+                        chain: None,
+                        ..not.clone()
+                    }),
+                    cst::Expression::And(and) => cst::Expression::And(cst::And {
+                        chain: None,
+                        ..and.clone()
+                    }),
+                    cst::Expression::Or(or) => cst::Expression::Or(cst::Or {
+                        chain: None,
+                        ..or.clone()
+                    }),
+                    cst::Expression::If(if_) => cst::Expression::If(cst::If {
+                        chain: None,
+                        ..if_.clone()
+                    }),
                     cst::Expression::Fn(fn_) => cst::Expression::Fn(cst::Fn_ {
                         chain: None,
                         ..fn_.clone()

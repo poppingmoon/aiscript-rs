@@ -83,6 +83,7 @@ peg::parser! {
                                 left: left.0.into(),
                                 right: right.0.into(),
                                 operator_loc: Loc{ start, end: end - 1 },
+                                chain: None,
                                 loc: None,
                             }
                         ),
@@ -96,6 +97,7 @@ peg::parser! {
                                 left: left.0.into(),
                                 right: right.0.into(),
                                 operator_loc: Loc{ start, end: end - 1 },
+                                chain: None,
                                 loc: None,
                             }
                         ),
@@ -603,6 +605,7 @@ peg::parser! {
             = start:position!() "!" expr:expr() end:position!() {
                 Not {
                     expr: expr.into(),
+                    chain: None,
                     loc: Some(Loc{ start, end: end - 1 }),
                 }
             }
@@ -612,10 +615,38 @@ peg::parser! {
         rule chain() -> Expression
             = e:expr3() chain:chain_member()+ {
                 match e {
-                    Expression::Not(_) => e,
-                    Expression::And(_) => e,
-                    Expression::Or(_) => e,
-                    Expression::If(_) => e,
+                    Expression::Not(not) => {
+                        let mut c = not.chain.unwrap_or_default();
+                        c.extend(chain);
+                        Expression::Not(Not {
+                            chain: Some(c),
+                            ..not
+                        })
+                    },
+                    Expression::And(and) => {
+                        let mut c = and.chain.unwrap_or_default();
+                        c.extend(chain);
+                        Expression::And(And {
+                            chain: Some(c),
+                            ..and
+                        })
+                    },
+                    Expression::Or(or) => {
+                        let mut c = or.chain.unwrap_or_default();
+                        c.extend(chain);
+                        Expression::Or(Or {
+                            chain: Some(c),
+                            ..or
+                        })
+                    },
+                    Expression::If(if_) => {
+                        let mut c = if_.chain.unwrap_or_default();
+                        c.extend(chain);
+                        Expression::If(If {
+                            chain: Some(c),
+                            ..if_
+                        })
+                    },
                     Expression::Fn(fn_) => {
                         let mut c = fn_.chain.unwrap_or_default();
                         c.extend(chain);
@@ -763,6 +794,7 @@ peg::parser! {
                     then: then.into(),
                     elseif: elseif.unwrap_or_default(),
                     else_: else_block.map(Into::into),
+                    chain: None,
                     loc: Some(Loc{ start, end: end - 1 }),
                 }
             }

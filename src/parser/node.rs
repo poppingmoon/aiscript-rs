@@ -313,6 +313,7 @@ impl From<Assign> for ast::Assign {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Not {
     pub expr: Box<Expression>,
+    pub chain: Option<Vec<ChainMember>>,
     pub loc: Option<Loc>,
 }
 
@@ -330,6 +331,7 @@ pub struct And {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub operator_loc: Loc,
+    pub chain: Option<Vec<ChainMember>>,
     pub loc: Option<Loc>,
 }
 
@@ -349,6 +351,7 @@ pub struct Or {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub operator_loc: Loc,
+    pub chain: Option<Vec<ChainMember>>,
     pub loc: Option<Loc>,
 }
 
@@ -369,6 +372,7 @@ pub struct If {
     pub then: Box<StatementOrExpression>,
     pub elseif: Vec<Elseif>,
     pub else_: Option<Box<StatementOrExpression>>,
+    pub chain: Option<Vec<ChainMember>>,
     pub loc: Option<Loc>,
 }
 

@@ -1596,6 +1596,41 @@ mod chain {
         }
         panic!();
     }
+
+    #[tokio::test]
+    async fn property_chain_with_if() {
+        let ast = Parser::default()
+            .parse(
+                r#"
+                (if a b else c).d
+                "#,
+            )
+            .unwrap();
+        let line = ast.first().unwrap().clone();
+        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line.clone() {
+            assert_eq!(name, "d".to_string());
+            if let Expression::If(If {
+                cond,
+                then,
+                else_: Some(else_),
+                ..
+            }) = *target
+            {
+                if let (
+                    Expression::Identifier(cond),
+                    StatementOrExpression::Expression(Expression::Identifier(then)),
+                    StatementOrExpression::Expression(Expression::Identifier(else_)),
+                ) = (*cond, *then, *else_)
+                {
+                    assert_eq!(cond.name, "a".to_string());
+                    assert_eq!(then.name, "b".to_string());
+                    assert_eq!(else_.name, "c".to_string());
+                    return;
+                }
+            }
+        }
+        panic!();
+    }
 }
 
 mod template_syntax {
