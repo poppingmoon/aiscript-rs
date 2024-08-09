@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = "0.4"
 futures = "0.3"
-indexmap = "2.2"
+indexmap = "2.3"
 peg = "0.8"
 percent-encoding = "2.3"
 rand = "0.8"
@@ -18,7 +18,7 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 thiserror = "1.0"
 tokio = { version = "1", features = ["rt", "time"] }
 unicode-segmentation = "1.11"
-uuid = { version = "1.8", features = ["v4"] }
+uuid = { version = "1.10", features = ["v4"] }
 
 [dev-dependencies]
 rustyline = "14.0"
