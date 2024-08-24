@@ -277,14 +277,14 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                         .next()
                         .map(f64::try_from)
                         .map_or(Ok(None), |r| r.map(|i| Some(i as isize)))?
-                        .unwrap_or(0);
+                        .unwrap_or(target_len);
                     if raw_index < -target_len || target_len < raw_index {
                         return Ok(Value::bool(false));
                     }
                     let index = if raw_index >= 0 {
-                        target_len - raw_index
+                        raw_index
                     } else {
-                        -raw_index
+                        target_len + raw_index
                     } as usize;
 
                     Ok(Value::bool(

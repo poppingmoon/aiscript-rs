@@ -3964,9 +3964,9 @@ mod primitive_props {
                 let str = "hello"
                 let empty = ""
                 <: [
-                    // str.ends_with("", 3), str.ends_with("lo", 5),
-                    // str.ends_with("ll", 4), str.ends_with("he", 2),
-                    // str.ends_with("ll", -1), str.ends_with("he", -3),
+                    str.ends_with("", 3), str.ends_with("lo", 5),
+                    str.ends_with("ll", 4), str.ends_with("he", 2),
+                    str.ends_with("ll", -1), str.ends_with("he", -3),
                     str.ends_with("he", 5), str.ends_with("lo", 3),
                     str.ends_with("lo", -6), str.ends_with("", -7),
                     str.ends_with("lo", 6), str.ends_with("", 7),
@@ -3977,12 +3977,12 @@ mod primitive_props {
                     assert_eq!(
                         res,
                         arr([
-                            // bool(true),
-                            // bool(true),
-                            // bool(true),
-                            // bool(true),
-                            // bool(true),
-                            // bool(true),
+                            bool(true),
+                            bool(true),
+                            bool(true),
+                            bool(true),
+                            bool(true),
+                            bool(true),
                             bool(false),
                             bool(false),
                             bool(false),
