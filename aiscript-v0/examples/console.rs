@@ -1,6 +1,6 @@
 use std::io::{prelude::*, stdin, stdout};
 
-use aiscript::{
+use aiscript_v0::{
     values::{Value, V},
     Interpreter, Parser,
 };

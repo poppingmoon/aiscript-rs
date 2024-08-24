@@ -1,4 +1,4 @@
-use aiscript::{
+use aiscript_v0::{
     ast::*,
     errors::{AiScriptError, AiScriptRuntimeError},
     utils,
@@ -85,7 +85,7 @@ mod interpreter {
                 .exec(
                     Parser::default()
                         .parse(
-                            "
+                            r#"
                             let a = 1
                             @b() {
                                 let x = a + 1
@@ -95,7 +95,7 @@ mod interpreter {
                                 var y = 2
                             }
                             var c = true
-                        ",
+                            "#,
                         )
                         .unwrap(),
                 )

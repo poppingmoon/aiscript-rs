@@ -3,8 +3,8 @@
 //! # Example
 //!
 //! ```
-//! use aiscript::{Interpreter, Parser};
-//! # use aiscript::errors::AiScriptError;
+//! use aiscript_v0::{Interpreter, Parser};
+//! # use aiscript_v0::errors::AiScriptError;
 //! use futures::FutureExt;
 //!
 //! # #[tokio::main]

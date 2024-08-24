@@ -1,6 +1,6 @@
 use std::{fs::File, io::prelude::*};
 
-use aiscript::Parser;
+use aiscript_v0::Parser;
 
 #[tokio::main]
 async fn main() {

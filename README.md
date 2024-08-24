@@ -2,12 +2,13 @@
 
 [![CI](https://github.com/poppingmoon/aiscript-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/poppingmoon/aiscript-rs/actions/workflows/ci.yml)
 
-Rust implementation of [AiScript](https://github.com/aiscript-dev/aiscript) (Experimental)
+Rust implementation of [AiScript](https://github.com/aiscript-dev/aiscript)
+(Experimental)
 
 ## Example
 
 ```rust
-use aiscript::{Interpreter, Parser};
+use aiscript::v0::{Interpreter, Parser};
 use futures::FutureExt;
 
 let script = Parser::default().parse("<: 'Hello, world!'")?;

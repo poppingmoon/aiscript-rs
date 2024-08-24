@@ -1,25 +1,2 @@
-[package]
-name = "aiscript"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-chrono = "0.4"
-futures = "0.3"
-indexmap = "2.3"
-peg = "0.8"
-percent-encoding = "2.3"
-rand = "0.8"
-regex = "1.10"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["preserve_order"] }
-thiserror = "1.0"
-tokio = { version = "1", features = ["rt", "time"] }
-unicode-segmentation = "1.11"
-uuid = { version = "1.10", features = ["v4"] }
-
-[dev-dependencies]
-rustyline = "14.0"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+[workspace]
+members = ["aiscript", "aiscript-v0"]
