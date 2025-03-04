@@ -15,7 +15,7 @@ use crate::{
     interpreter::{
         lib::std::seedrandom::seedrandom,
         util::expect_any,
-        value::{Value, V},
+        value::{V, Value},
     },
     values::{VFn, VObj},
 };
@@ -1103,7 +1103,7 @@ pub fn std() -> HashMap<String, Value> {
                     _ => None,
                 }
                 .map_or_else(Value::null, |seed| {
-                    let rng = Arc::new(Mutex::new(seedrandom(&seed)));
+                    let rng = Arc::new(Mutex::new(seedrandom(seed)));
                     Value::fn_native(move |args, _| {
                         let r = (rng.clone().lock().unwrap())();
                         async move {

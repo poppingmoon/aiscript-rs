@@ -7,8 +7,8 @@ const STARTDENOM: u64 = (u8::MAX as u64 + 1).pow(CHUNKS);
 const SIGNIFICANCE: u64 = 2_u64.pow(DIGITS);
 const OVERFLOW: u64 = SIGNIFICANCE * 2;
 
-pub fn seedrandom(seed: &str) -> impl FnMut() -> f64 {
-    let key = mixkey(seed);
+pub fn seedrandom(seed: String) -> impl FnMut() -> f64 {
+    let key = mixkey(&seed);
     let mut arc4 = Arc4::new(key);
     move || {
         let mut n = arc4
