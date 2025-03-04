@@ -101,8 +101,8 @@ impl Scope {
         }
     }
 
-    pub fn add(&self, name: String, variable: Variable) -> Result<(), AiScriptError> {
-        if self.states.read().unwrap().contains_key(&name) {
+    pub fn add(&self, name: &str, variable: Variable) -> Result<(), AiScriptError> {
+        if self.states.read().unwrap().contains_key(name) {
             Err(AiScriptRuntimeError::Runtime(format!(
                 "Variable '{name}' already exists in scope '{}'",
                 self.name
@@ -111,33 +111,33 @@ impl Scope {
             self.states
                 .write()
                 .unwrap()
-                .insert(name.clone(), variable.clone());
+                .insert(name.to_string(), variable.clone());
             if let Some(parent) = &self.parent {
                 if let Some(ns_name) = &self.ns_name {
-                    parent.add(format!("{ns_name}:{name}"), variable)?;
+                    parent.add(&format!("{ns_name}:{name}"), variable)?;
                 }
             }
             Ok(())
         }
     }
 
-    pub fn assign(&self, name: String, val: Value) -> Result<(), AiScriptError> {
+    pub fn assign(&self, name: &str, val: Value) -> Result<(), AiScriptError> {
         self.assign_(name, val, &self.name)
     }
 
-    fn assign_(&self, name: String, val: Value, scope_name: &str) -> Result<(), AiScriptError> {
+    fn assign_(&self, name: &str, val: Value, scope_name: &str) -> Result<(), AiScriptError> {
         let is_mut = self
             .states
             .read()
             .unwrap()
-            .get(&name)
+            .get(name)
             .map(|variable| matches!(variable, Variable::Mut(_)));
         match is_mut {
             Some(true) => {
                 self.states
                     .write()
                     .unwrap()
-                    .insert(name, Variable::Mut(val));
+                    .insert(name.to_string(), Variable::Mut(val));
                 Ok(())
             }
             Some(false) => Err(AiScriptRuntimeError::Runtime(format!(

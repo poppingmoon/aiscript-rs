@@ -14,9 +14,9 @@ use super::{
     value::{VFn, Value, V},
 };
 
-pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError> {
+pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> {
     Ok(match *target.value {
-        V::Num(target) => match name.as_str() {
+        V::Num(target) => match name {
             "to_str" => Value::fn_native(move |_, _| {
                 async move { Ok(Value::str(target.to_string())) }.boxed()
             }),
@@ -24,7 +24,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                 "No such prop ({name}) in number."
             )))?,
         },
-        V::Str(target) => match name.as_str() {
+        V::Str(target) => match name {
             "to_num" => Value::fn_native(move |_, _| {
                 let parsed = target.parse::<f64>();
                 async move {
@@ -349,7 +349,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                 "No such prop ({name}) in string."
             )))?,
         },
-        V::Arr(target) => match name.as_str() {
+        V::Arr(target) => match name {
             "len" => Value::num(target.read().unwrap().len() as f64),
             "push" => Value::fn_native(move |args, _| {
                 let target = target.clone();
@@ -902,7 +902,7 @@ pub fn get_prim_prop(target: Value, name: String) -> Result<Value, AiScriptError
                 "No such prop ({name}) in string."
             )))?,
         },
-        V::Error { value, info } => match name.as_str() {
+        V::Error { value, info } => match name {
             "name" => Value::str(value),
             "info" => info.map_or_else(Value::null, |info| *info),
             _ => Err(AiScriptRuntimeError::Runtime(format!(

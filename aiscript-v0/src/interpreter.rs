@@ -127,7 +127,7 @@ impl Interpreter {
     pub async fn exec(&self, script: Vec<ast::Node>) -> Result<Option<Value>, AiScriptError> {
         self.stop.store(false, Ordering::SeqCst);
         let script = self.collect_ns(script, self.scope.clone()).await?;
-        let result = self.run(script, &self.scope).await;
+        let result = self.run(&script, &self.scope).await;
         self.handle_error(result).await
     }
 
@@ -220,16 +220,26 @@ impl Interpreter {
         &self,
         script: impl IntoIterator<Item = impl Into<ast::Node>>,
         scope: Scope,
-    ) -> Result<Vec<ast::Node>, AiScriptError> {
+    ) -> Result<Vec<ast::StatementOrExpression>, AiScriptError> {
         let mut nodes = Vec::new();
         for node in script {
             match node.into() {
                 ast::Node::Namespace(namespace) => {
                     self.collect_ns_member(namespace.clone(), scope.clone())
                         .await?;
-                    nodes.push(ast::Node::Namespace(namespace));
+                    nodes.push(ast::StatementOrExpression::Expression(
+                        ast::Expression::Null(ast::Null { loc: namespace.loc }),
+                    ))
                 }
-                node => nodes.push(node),
+                ast::Node::Statement(statement) => {
+                    nodes.push(ast::StatementOrExpression::Statement(statement))
+                }
+                ast::Node::Expression(expression) => {
+                    nodes.push(ast::StatementOrExpression::Expression(expression))
+                }
+                ast::Node::Meta(meta) => nodes.push(ast::StatementOrExpression::Expression(
+                    ast::Expression::Null(ast::Null { loc: meta.loc }),
+                )),
             }
         }
         Ok(nodes)
@@ -260,8 +270,9 @@ impl Interpreter {
                             "Namespaces cannot include mutable variable: {name}".to_string(),
                         ))?;
                     } else {
-                        let variable = Variable::Const(self.eval(expr, &ns_scope).await?);
-                        ns_scope.add(name, variable)?;
+                        let variable =
+                            Variable::Const(self.eval_expression(&expr, &ns_scope).await?);
+                        ns_scope.add(&name, variable)?;
                     }
                 }
             }
@@ -289,7 +300,7 @@ impl Interpreter {
                 )
                 .collect();
                 async move {
-                    self.run(statements, &scope.create_child_scope(args, None))
+                    self.run(&statements, &scope.create_child_scope(args, None))
                         .map(|r| r.map(unwrap_ret))
                         .await
                 }
@@ -301,13 +312,12 @@ impl Interpreter {
 
     fn eval<'a>(
         &'a self,
-        node: impl Into<ast::Node>,
+        statement_or_expression: &'a ast::StatementOrExpression,
         scope: &'a Scope,
     ) -> BoxFuture<'a, Result<Value, AiScriptError>> {
         if self.stop.load(Ordering::SeqCst) {
             return async move { Ok(Value::null()) }.boxed();
         }
-        let node = node.into();
         async move {
             let step_count = self.step_count.load(Ordering::SeqCst);
             if step_count % IRQ_RATE == IRQ_AT {
@@ -321,9 +331,8 @@ impl Interpreter {
                     ))?
                 }
             }
-            Ok(match node {
-                ast::Node::Namespace(_) | ast::Node::Meta(_) => Value::null(),
-                ast::Node::Statement(statement) => match statement {
+            Ok(match statement_or_expression {
+                ast::StatementOrExpression::Statement(statement) => match statement {
                     ast::Statement::Definition(ast::Definition {
                         name,
                         expr,
@@ -331,14 +340,14 @@ impl Interpreter {
                         attr,
                         ..
                     }) => {
-                        let value = self.eval(expr, scope).await?;
+                        let value = self.eval_expression(expr, scope).await?;
                         let attr = match attr {
                             Some(attr) => {
                                 let mut attrs = Vec::new();
                                 for n_attr in attr {
                                     attrs.push(Attr {
-                                        name: n_attr.name,
-                                        value: self.eval(n_attr.value, scope).await?,
+                                        name: n_attr.name.to_string(),
+                                        value: self.eval_expression(&n_attr.value, scope).await?,
                                     })
                                 }
                                 Some(attrs)
@@ -347,7 +356,7 @@ impl Interpreter {
                         };
                         scope.add(
                             name,
-                            if mut_ {
+                            if *mut_ {
                                 Variable::Mut(Value { attr, ..value })
                             } else {
                                 Variable::Const(Value { attr, ..value })
@@ -356,20 +365,20 @@ impl Interpreter {
                         Value::null()
                     }
                     ast::Statement::Return(ast::Return { expr, .. }) => {
-                        let val = self.eval(expr, scope).await?;
+                        let val = self.eval_expression(expr, scope).await?;
                         Value::return_(val)
                     }
                     ast::Statement::Each(ast::Each {
                         items, for_, var, ..
                     }) => {
-                        let items = self.eval(items, scope).await?;
+                        let items = self.eval_expression(items, scope).await?;
                         let items = <Vec<Value>>::try_from(items)?;
                         for item in items {
                             let scope = scope.create_child_scope(
                                 HashMap::from_iter([(var.clone(), Variable::Const(item))]),
                                 None,
                             );
-                            let v = self.eval(*for_.clone(), &scope).await?;
+                            let v = self.eval(for_, &scope).await?;
                             match *v.value {
                                 V::Break => {
                                     break;
@@ -391,11 +400,11 @@ impl Interpreter {
                         ..
                     }) => {
                         if let Some(times) = times {
-                            let times = self.eval(times, scope).await?;
+                            let times = self.eval_expression(times, scope).await?;
                             let times = f64::try_from(times)?;
                             let mut i = 0.0;
                             while i < times {
-                                let v = self.eval(*for_.clone(), scope).await?;
+                                let v = self.eval(for_, scope).await?;
                                 match *v.value {
                                     V::Break => {
                                         break;
@@ -408,8 +417,8 @@ impl Interpreter {
                                 i += 1.0;
                             }
                         } else if let (Some(from), Some(to), Some(var)) = (from, to, var) {
-                            let from = self.eval(from, scope).await?;
-                            let to = self.eval(to, scope).await?;
+                            let from = self.eval_expression(from, scope).await?;
+                            let to = self.eval_expression(to, scope).await?;
                             let from = f64::try_from(from)?;
                             let to = f64::try_from(to)?;
                             let mut i = from;
@@ -421,7 +430,7 @@ impl Interpreter {
                                     )]),
                                     None,
                                 );
-                                let v = self.eval(*for_.clone(), &scope).await?;
+                                let v = self.eval(for_, &scope).await?;
                                 match *v.value {
                                     V::Break => {
                                         break;
@@ -438,10 +447,7 @@ impl Interpreter {
                     }
                     ast::Statement::Loop(ast::Loop { statements, .. }) => loop {
                         let v = self
-                            .run(
-                                statements.clone(),
-                                &scope.create_child_scope(HashMap::new(), None),
-                            )
+                            .run(statements, &scope.create_child_scope(HashMap::new(), None))
                             .await?;
                         match *v.value {
                             V::Break => {
@@ -456,219 +462,231 @@ impl Interpreter {
                     ast::Statement::Break(_) => Value::break_(),
                     ast::Statement::Continue(_) => Value::continue_(),
                     ast::Statement::Assign(ast::Assign { expr, dest, .. }) => {
-                        let v = self.eval(expr, scope).await?;
+                        let v = self.eval_expression(expr, scope).await?;
                         self.assign(scope, dest, v).await?;
                         Value::null()
                     }
                     ast::Statement::AddAssign(ast::AddAssign { expr, dest, .. }) => {
-                        let target = self.eval(dest.clone(), scope).await?;
+                        let target = self.eval_expression(dest, scope).await?;
                         let target = f64::try_from(target)?;
-                        let v = self.eval(expr, scope).await?;
+                        let v = self.eval_expression(expr, scope).await?;
                         let v = f64::try_from(v)?;
                         self.assign(scope, dest, Value::num(target + v)).await?;
                         Value::null()
                     }
                     ast::Statement::SubAssign(ast::SubAssign { expr, dest, .. }) => {
-                        let target = self.eval(dest.clone(), scope).await?;
+                        let target = self.eval_expression(dest, scope).await?;
                         let target = f64::try_from(target)?;
-                        let v = self.eval(expr, scope).await?;
+                        let v = self.eval_expression(expr, scope).await?;
                         let v = f64::try_from(v)?;
                         self.assign(scope, dest, Value::num(target - v)).await?;
                         Value::null()
                     }
                 },
-                ast::Node::Expression(expression) => match expression {
-                    ast::Expression::If(ast::If {
-                        cond,
-                        then,
-                        elseif,
-                        else_,
-                        ..
-                    }) => {
-                        let cond = self.eval(*cond, scope).await?;
-                        let cond = bool::try_from(cond)?;
-                        if cond {
-                            self.eval(*then, scope).await?
-                        } else {
-                            for ast::Elseif { cond, then } in elseif {
-                                let cond = self.eval(cond, scope).await?;
-                                let cond = bool::try_from(cond)?;
-                                if cond {
-                                    return self.eval(then, scope).await;
-                                }
-                            }
-                            if let Some(else_) = else_ {
-                                self.eval(*else_, scope).await?
-                            } else {
-                                Value::null()
-                            }
-                        }
-                    }
-                    ast::Expression::Fn(ast::Fn { args, children, .. }) => Value::fn_(
-                        args.into_iter().map(|arg| arg.name),
-                        children,
-                        scope.clone(),
-                    ),
-                    ast::Expression::Match(ast::Match {
-                        about, qs, default, ..
-                    }) => {
-                        let about = self.eval(*about, scope).await?;
-                        for ast::QA { q, a } in qs {
-                            let q = self.eval(q, scope).await?;
-                            if about == q {
-                                return self.eval(a, scope).await;
+                ast::StatementOrExpression::Expression(expression) => {
+                    self.eval_expression(expression, scope).await?
+                }
+            })
+        }
+        .boxed()
+    }
+
+    fn eval_expression<'a>(
+        &'a self,
+        expression: &'a ast::Expression,
+        scope: &'a Scope,
+    ) -> BoxFuture<'a, Result<Value, AiScriptError>> {
+        async move {
+            Ok(match expression {
+                ast::Expression::If(ast::If {
+                    cond,
+                    then,
+                    elseif,
+                    else_,
+                    ..
+                }) => {
+                    let cond = self.eval_expression(cond, scope).await?;
+                    let cond = bool::try_from(cond)?;
+                    if cond {
+                        self.eval(then, scope).await?
+                    } else {
+                        for ast::Elseif { cond, then } in elseif {
+                            let cond = self.eval_expression(cond, scope).await?;
+                            let cond = bool::try_from(cond)?;
+                            if cond {
+                                return self.eval(then, scope).await;
                             }
                         }
-                        if let Some(default) = default {
-                            self.eval(*default, scope).await?
+                        if let Some(else_) = else_ {
+                            self.eval(else_, scope).await?
                         } else {
                             Value::null()
                         }
                     }
-                    ast::Expression::Block(ast::Block { statements, .. }) => {
-                        self.run(statements, &scope.create_child_scope(HashMap::new(), None))
-                            .await?
+                }
+                ast::Expression::Fn(ast::Fn { args, children, .. }) => Value::fn_(
+                    args.iter().map(|arg| arg.name.to_string()),
+                    children.clone(),
+                    scope.clone(),
+                ),
+                ast::Expression::Match(ast::Match {
+                    about, qs, default, ..
+                }) => {
+                    let about = self.eval_expression(about, scope).await?;
+                    for ast::QA { q, a } in qs {
+                        let q = self.eval_expression(q, scope).await?;
+                        if about == q {
+                            return self.eval(a, scope).await;
+                        }
                     }
-                    ast::Expression::Exists(ast::Exists { identifier, .. }) => {
-                        Value::bool(scope.exists(&identifier.name))
+                    if let Some(default) = default {
+                        self.eval(default, scope).await?
+                    } else {
+                        Value::null()
                     }
-                    ast::Expression::Tmpl(ast::Tmpl { tmpl, .. }) => {
-                        let mut str = Vec::new();
-                        for x in tmpl {
-                            match x {
-                                ast::StringOrExpression::String(x) => str.push(x),
-                                ast::StringOrExpression::Expression(x) => {
-                                    let v = self.eval(x, scope).await?;
-                                    str.push(v.value.repr_value().to_string())
-                                }
+                }
+                ast::Expression::Block(ast::Block { statements, .. }) => {
+                    self.run(statements, &scope.create_child_scope(HashMap::new(), None))
+                        .await?
+                }
+                ast::Expression::Exists(ast::Exists { identifier, .. }) => {
+                    Value::bool(scope.exists(&identifier.name))
+                }
+                ast::Expression::Tmpl(ast::Tmpl { tmpl, .. }) => {
+                    let mut str = String::new();
+                    for x in tmpl {
+                        match x {
+                            ast::StringOrExpression::String(x) => str += x,
+                            ast::StringOrExpression::Expression(x) => {
+                                let v = self.eval_expression(x, scope).await?;
+                                str += &v.value.repr_value().to_string()
                             }
                         }
-                        Value::str(str.concat())
                     }
-                    ast::Expression::Str(ast::Str { value, .. }) => Value::str(value),
-                    ast::Expression::Num(ast::Num { value, .. }) => Value::num(value),
-                    ast::Expression::Bool(ast::Bool { value, .. }) => Value::bool(value),
-                    ast::Expression::Null(_) => Value::null(),
-                    ast::Expression::Obj(ast::Obj { value, .. }) => {
-                        let mut obj = IndexMap::new();
-                        for (k, v) in value {
-                            obj.insert(k, self.eval(v, scope).await?);
-                        }
-                        Value::obj(obj)
+                    Value::str(str)
+                }
+                ast::Expression::Str(ast::Str { value, .. }) => Value::str(value),
+                ast::Expression::Num(ast::Num { value, .. }) => Value::num(*value),
+                ast::Expression::Bool(ast::Bool { value, .. }) => Value::bool(*value),
+                ast::Expression::Null(_) => Value::null(),
+                ast::Expression::Obj(ast::Obj { value, .. }) => {
+                    let mut obj = IndexMap::new();
+                    for (k, v) in value {
+                        obj.insert(k, self.eval_expression(v, scope).await?);
                     }
-                    ast::Expression::Arr(ast::Arr { value, .. }) => Value::arr(
-                        try_join_all(value.into_iter().map(|node| self.eval(node, scope))).await?,
-                    ),
-                    ast::Expression::Not(ast::Not { expr, .. }) => {
-                        let v = self.eval(*expr, scope).await?;
-                        let bool = bool::try_from(v)?;
-                        Value::bool(!bool)
-                    }
-                    ast::Expression::And(ast::And { left, right, .. }) => {
-                        let Value {
-                            value: left_value,
+                    Value::obj(obj)
+                }
+                ast::Expression::Arr(ast::Arr { value, .. }) => Value::arr(
+                    try_join_all(value.iter().map(|expr| self.eval_expression(expr, scope)))
+                        .await?,
+                ),
+                ast::Expression::Not(ast::Not { expr, .. }) => {
+                    let v = self.eval_expression(expr, scope).await?;
+                    let bool = bool::try_from(v)?;
+                    Value::bool(!bool)
+                }
+                ast::Expression::And(ast::And { left, right, .. }) => {
+                    let Value {
+                        value: left_value,
+                        attr,
+                    } = self.eval_expression(left, scope).await?;
+                    let left_value = bool::try_from(*left_value)?;
+                    if !left_value {
+                        Value {
+                            value: Box::new(V::Bool(left_value)),
                             attr,
-                        } = self.eval(*left, scope).await?;
-                        let left_value = bool::try_from(*left_value)?;
-                        if !left_value {
-                            Value {
-                                value: Box::new(V::Bool(left_value)),
-                                attr,
-                            }
-                        } else {
-                            let Value {
-                                value: right_value,
-                                attr,
-                            } = self.eval(*right, scope).await?;
-                            let right_value = bool::try_from(*right_value)?;
-                            Value {
-                                value: Box::new(V::Bool(right_value)),
-                                attr,
-                            }
                         }
-                    }
-                    ast::Expression::Or(ast::Or { left, right, .. }) => {
+                    } else {
                         let Value {
-                            value: left_value,
+                            value: right_value,
                             attr,
-                        } = self.eval(*left, scope).await?;
-                        let left_value = bool::try_from(*left_value)?;
-                        if left_value {
-                            Value {
-                                value: Box::new(V::Bool(left_value)),
-                                attr,
-                            }
-                        } else {
-                            let Value {
-                                value: right_value,
-                                attr,
-                            } = self.eval(*right, scope).await?;
-                            let right_value = bool::try_from(*right_value)?;
-                            Value {
-                                value: Box::new(V::Bool(right_value)),
-                                attr,
-                            }
+                        } = self.eval_expression(right, scope).await?;
+                        let right_value = bool::try_from(*right_value)?;
+                        Value {
+                            value: Box::new(V::Bool(right_value)),
+                            attr,
                         }
                     }
-                    ast::Expression::Identifier(ast::Identifier { name, .. }) => {
-                        scope.get(&name)?
-                    }
-                    ast::Expression::Call(ast::Call { target, args, .. }) => {
-                        let callee = self.eval(*target, scope).await?;
-                        let callee = VFn::try_from(callee)?;
-                        let args =
-                            try_join_all(args.into_iter().map(|node| self.eval(node, scope)))
-                                .await?;
-                        self.fn_(callee, args).await?
-                    }
-                    ast::Expression::Index(ast::Index { target, index, .. }) => {
-                        let target = self.eval(*target, scope).await?;
-                        let i = self.eval(*index, scope).await?;
-                        match *target.value {
-                            V::Arr(arr) => {
-                                let i = f64::try_from(i)?;
-                                let item = if i.trunc() == i {
-                                    arr.read().unwrap().get(i as usize).cloned()
-                                } else {
-                                    None
-                                };
-                                if let Some(item) = item {
-                                    item
-                                } else {
-                                    Err(AiScriptRuntimeError::IndexOutOfRange(
-                                        i,
-                                        arr.read().unwrap().len() as isize - 1,
-                                    ))?
-                                }
-                            }
-                            V::Obj(obj) => {
-                                let i = String::try_from(i)?;
-                                if let Some(item) = obj.read().unwrap().get(&i) {
-                                    item.clone()
-                                } else {
-                                    Value::null()
-                                }
-                            }
-                            target => Err(AiScriptRuntimeError::Runtime(format!(
-                                "Cannot read prop ({}) of {}.",
-                                i.value.repr_value(),
-                                target.display_type(),
-                            )))?,
+                }
+                ast::Expression::Or(ast::Or { left, right, .. }) => {
+                    let Value {
+                        value: left_value,
+                        attr,
+                    } = self.eval_expression(left, scope).await?;
+                    let left_value = bool::try_from(*left_value)?;
+                    if left_value {
+                        Value {
+                            value: Box::new(V::Bool(left_value)),
+                            attr,
+                        }
+                    } else {
+                        let Value {
+                            value: right_value,
+                            attr,
+                        } = self.eval_expression(right, scope).await?;
+                        let right_value = bool::try_from(*right_value)?;
+                        Value {
+                            value: Box::new(V::Bool(right_value)),
+                            attr,
                         }
                     }
-                    ast::Expression::Prop(ast::Prop { target, name, .. }) => {
-                        let value = self.eval(*target.clone(), scope).await?;
-                        if let V::Obj(value) = *value.value {
-                            if let Some(value) = value.read().unwrap().get(&name) {
-                                value.clone()
+                }
+                ast::Expression::Identifier(ast::Identifier { name, .. }) => scope.get(name)?,
+                ast::Expression::Call(ast::Call { target, args, .. }) => {
+                    let callee = self.eval_expression(target, scope).await?;
+                    let callee = VFn::try_from(callee)?;
+                    let args =
+                        try_join_all(args.iter().map(|expr| self.eval_expression(expr, scope)))
+                            .await?;
+                    self.fn_(callee, args).await?
+                }
+                ast::Expression::Index(ast::Index { target, index, .. }) => {
+                    let target = self.eval_expression(target, scope).await?;
+                    let i = self.eval_expression(index, scope).await?;
+                    match *target.value {
+                        V::Arr(arr) => {
+                            let i = f64::try_from(i)?;
+                            let item = if i.trunc() == i {
+                                arr.read().unwrap().get(i as usize).cloned()
+                            } else {
+                                None
+                            };
+                            if let Some(item) = item {
+                                item
+                            } else {
+                                Err(AiScriptRuntimeError::IndexOutOfRange(
+                                    i,
+                                    arr.read().unwrap().len() as isize - 1,
+                                ))?
+                            }
+                        }
+                        V::Obj(obj) => {
+                            let i = String::try_from(i)?;
+                            if let Some(item) = obj.read().unwrap().get(&i) {
+                                item.clone()
                             } else {
                                 Value::null()
                             }
-                        } else {
-                            get_prim_prop(value, name)?
                         }
+                        target => Err(AiScriptRuntimeError::Runtime(format!(
+                            "Cannot read prop ({}) of {}.",
+                            i.value.repr_value(),
+                            target.display_type(),
+                        )))?,
                     }
-                },
+                }
+                ast::Expression::Prop(ast::Prop { target, name, .. }) => {
+                    let value = self.eval_expression(target, scope).await?;
+                    if let V::Obj(value) = *value.value {
+                        if let Some(value) = value.read().unwrap().get(name) {
+                            value.clone()
+                        } else {
+                            Value::null()
+                        }
+                    } else {
+                        get_prim_prop(value, name)?
+                    }
+                }
             })
         }
         .boxed()
@@ -676,7 +694,7 @@ impl Interpreter {
 
     async fn run(
         &self,
-        program: impl IntoIterator<Item = impl Into<ast::Node>>,
+        program: &[ast::StatementOrExpression],
         scope: &Scope,
     ) -> Result<Value, AiScriptError> {
         let mut v = Value::null();
@@ -704,7 +722,7 @@ impl Interpreter {
     fn assign<'a>(
         &'a self,
         scope: &'a Scope,
-        dest: ast::Expression,
+        dest: &'a ast::Expression,
         value: Value,
     ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
@@ -713,8 +731,8 @@ impl Interpreter {
                     scope.assign(name, value)?
                 }
                 ast::Expression::Index(ast::Index { target, index, .. }) => {
-                    let assignee = self.eval(*target.clone(), scope).await?;
-                    let i = self.eval(*index, scope).await?;
+                    let assignee = self.eval_expression(target, scope).await?;
+                    let i = self.eval_expression(index, scope).await?;
                     match *assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
@@ -739,13 +757,13 @@ impl Interpreter {
                     }
                 }
                 ast::Expression::Prop(ast::Prop { target, name, .. }) => {
-                    let assignee = self.eval(*target.clone(), scope).await?;
+                    let assignee = self.eval_expression(target, scope).await?;
                     let assignee = VObj::try_from(assignee)?;
-                    assignee.write().unwrap().insert(name, value);
+                    assignee.write().unwrap().insert(name.to_string(), value);
                 }
                 ast::Expression::Arr(ast::Arr { value: target, .. }) => {
                     let value = <Vec<Value>>::try_from(value)?;
-                    try_join_all(target.into_iter().enumerate().map(|(index, item)| {
+                    try_join_all(target.iter().enumerate().map(|(index, item)| {
                         self.assign(scope, item, value.get(index).cloned().unwrap_or_default())
                     }))
                     .await?;
@@ -753,7 +771,7 @@ impl Interpreter {
                 ast::Expression::Obj(ast::Obj { value: target, .. }) => {
                     let value = <IndexMap<String, Value>>::try_from(value)?;
                     try_join_all(target.into_iter().map(|(key, item)| {
-                        self.assign(scope, item, value.get(&key).cloned().unwrap_or_default())
+                        self.assign(scope, item, value.get(key).cloned().unwrap_or_default())
                     }))
                     .await?;
                 }
