@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 
 use crate::{error::AiScriptError, node::StatementOrExpression};
 
-use super::{scope::Scope, Interpreter};
+use super::{Interpreter, scope::Scope};
 
 #[derive(Clone, Debug, Default)]
 pub enum V {
@@ -156,9 +156,9 @@ impl Value {
 
     pub fn fn_native(
         value: impl Fn(Vec<Value>, &Interpreter) -> BoxFuture<'static, Result<Value, AiScriptError>>
-            + Sync
-            + Send
-            + 'static,
+        + Sync
+        + Send
+        + 'static,
     ) -> Self {
         Value::new(V::Fn(VFn::FnNative(Arc::new(value))))
     }

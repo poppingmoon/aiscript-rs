@@ -1,17 +1,18 @@
 use futures::{
-    future::{try_join_all, BoxFuture},
-    try_join, FutureExt,
+    FutureExt,
+    future::{BoxFuture, try_join_all},
+    try_join,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    error::{AiScriptError, AiScriptRuntimeError},
     Interpreter,
+    error::{AiScriptError, AiScriptRuntimeError},
 };
 
 use super::{
     util::expect_any,
-    value::{VFn, Value, V},
+    value::{V, VFn, Value},
 };
 
 pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> {

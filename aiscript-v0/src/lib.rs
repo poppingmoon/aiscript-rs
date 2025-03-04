@@ -53,6 +53,6 @@ pub mod values {
 }
 
 pub use constants::AISCRIPT_VERSION;
-pub use interpreter::scope::Scope;
 pub use interpreter::Interpreter;
+pub use interpreter::scope::Scope;
 pub use parser::{Parser, ParserPlugin, PluginType};

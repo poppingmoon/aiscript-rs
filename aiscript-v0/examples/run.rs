@@ -3,7 +3,7 @@ use std::{
     io::{prelude::*, stdin, stdout},
 };
 
-use aiscript_v0::{values::Value, Interpreter, Parser};
+use aiscript_v0::{Interpreter, Parser, values::Value};
 use futures::FutureExt;
 
 #[tokio::main]

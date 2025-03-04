@@ -3,7 +3,7 @@
 use std::str::Utf8Error;
 
 use percent_encoding::{
-    percent_decode_str, percent_encode_byte, utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC,
+    AsciiSet, NON_ALPHANUMERIC, percent_decode_str, percent_encode_byte, utf8_percent_encode,
 };
 
 const URI_COMPONENT_ESCAPE: &AsciiSet = &NON_ALPHANUMERIC

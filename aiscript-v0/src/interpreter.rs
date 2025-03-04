@@ -4,15 +4,15 @@ use std::{
     collections::HashMap,
     iter::{repeat, zip},
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
 
 use futures::{
-    future::{try_join_all, BoxFuture},
     Future, FutureExt,
+    future::{BoxFuture, try_join_all},
 };
 use indexmap::IndexMap;
 use value::VObj;
@@ -27,7 +27,7 @@ use self::{
     primitive_props::get_prim_prop,
     scope::Scope,
     util::expect_any,
-    value::{unwrap_ret, Attr, VFn, Value, V},
+    value::{Attr, V, VFn, Value, unwrap_ret},
     variable::Variable,
 };
 

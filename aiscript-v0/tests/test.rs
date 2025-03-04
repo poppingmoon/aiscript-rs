@@ -1,9 +1,9 @@
 use aiscript_v0::{
+    Interpreter, Parser,
     ast::*,
     errors::{AiScriptError, AiScriptRuntimeError},
     utils,
     values::Value,
-    Interpreter, Parser,
 };
 use futures::FutureExt;
 use indexmap::IndexMap;
@@ -1555,8 +1555,10 @@ mod chain {
             if let Expression::Call(Call { target, args, .. }) = *target {
                 if let Expression::Identifier(Identifier { name, .. }) = *target {
                     assert_eq!(name, "foo".to_string());
-                    if let [Expression::Num(Num { value: arg1, .. }), Expression::Num(Num { value: arg2, .. })] =
-                        args[..]
+                    if let [
+                        Expression::Num(Num { value: arg1, .. }),
+                        Expression::Num(Num { value: arg2, .. }),
+                    ] = args[..]
                     {
                         assert_eq!(arg1, 42.0);
                         assert_eq!(arg2, 57.0);
@@ -3240,11 +3242,13 @@ mod attribute {
         {
             assert_eq!(name, "onReceived");
             if let Some(attr) = attr {
-                if let [Attribute {
-                    name,
-                    value: Expression::Str(Str { value, .. }),
-                    ..
-                }] = &attr[..]
+                if let [
+                    Attribute {
+                        name,
+                        value: Expression::Str(Str { value, .. }),
+                        ..
+                    },
+                ] = &attr[..]
                 {
                     assert_eq!(name, "Event");
                     assert_eq!(value, "Received");
@@ -3273,19 +3277,23 @@ mod attribute {
         {
             assert_eq!(name, "createNote");
             if let Some(attr) = attr {
-                if let [Attribute {
-                    name: name1,
-                    value: Expression::Obj(Obj { value: value1, .. }),
-                    ..
-                }, Attribute {
-                    name: name2,
-                    value: Expression::Str(Str { value: value2, .. }),
-                    ..
-                }, Attribute {
-                    name: name3,
-                    value: Expression::Bool(Bool { value: true, .. }),
-                    ..
-                }] = &attr[..]
+                if let [
+                    Attribute {
+                        name: name1,
+                        value: Expression::Obj(Obj { value: value1, .. }),
+                        ..
+                    },
+                    Attribute {
+                        name: name2,
+                        value: Expression::Str(Str { value: value2, .. }),
+                        ..
+                    },
+                    Attribute {
+                        name: name3,
+                        value: Expression::Bool(Bool { value: true, .. }),
+                        ..
+                    },
+                ] = &attr[..]
                 {
                     assert_eq!(name1, "Endpoint");
                     assert_eq!(name2, "Desc");
@@ -3318,11 +3326,13 @@ mod attribute {
         {
             assert_eq!(name, "data");
             if let Some(attr) = attr {
-                if let [Attribute {
-                    name,
-                    value: Expression::Bool { .. },
-                    ..
-                }] = &attr[..]
+                if let [
+                    Attribute {
+                        name,
+                        value: Expression::Bool { .. },
+                        ..
+                    },
+                ] = &attr[..]
                 {
                     assert_eq!(name, "serializable");
                     return;
@@ -3345,10 +3355,12 @@ mod location {
                 "#,
             )
             .unwrap();
-        if let [Node::Statement(Statement::Definition(Definition {
-            loc: Some(Loc { start, end }),
-            ..
-        }))] = &nodes[..]
+        if let [
+            Node::Statement(Statement::Definition(Definition {
+                loc: Some(Loc { start, end }),
+                ..
+            })),
+        ] = &nodes[..]
         {
             assert_eq!(start.clone(), 3);
             assert_eq!(end.clone(), 13);
@@ -3369,10 +3381,12 @@ mod location {
                 "#,
             )
             .unwrap();
-        if let [Node::Statement(Statement::Definition(Definition {
-            loc: Some(Loc { start, end }),
-            ..
-        }))] = &nodes[..]
+        if let [
+            Node::Statement(Statement::Definition(Definition {
+                loc: Some(Loc { start, end }),
+                ..
+            })),
+        ] = &nodes[..]
         {
             assert_eq!(start.clone(), 23);
             assert_eq!(end.clone(), 33);

@@ -6,14 +6,14 @@ use std::{
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::Visitor,
     ser::{self, SerializeMap, SerializeSeq},
-    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use crate::error::{AiScriptError, AiScriptRuntimeError};
 
-use super::value::{VArr, VFn, VObj, Value, V};
+use super::value::{V, VArr, VFn, VObj, Value};
 
 pub fn expect_any(val: Option<Value>) -> Result<Value, AiScriptError> {
     Ok(val.ok_or_else(|| {

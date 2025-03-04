@@ -1,8 +1,8 @@
 use std::io::{prelude::*, stdin, stdout};
 
 use aiscript_v0::{
-    values::{Value, V},
     Interpreter, Parser,
+    values::{V, Value},
 };
 use futures::FutureExt;
 use rustyline::error::ReadlineError;
