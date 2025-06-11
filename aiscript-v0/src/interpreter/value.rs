@@ -64,7 +64,7 @@ pub enum VFn {
     Fn {
         args: Vec<String>,
         statements: Vec<StatementOrExpression>,
-        scope: Scope,
+        scope: Box<Scope>,
     },
     FnNative(VFnNative),
 }
@@ -145,7 +145,7 @@ impl Value {
     pub fn fn_(
         args: impl IntoIterator<Item = impl Into<String>>,
         statements: impl IntoIterator<Item = StatementOrExpression>,
-        scope: Scope,
+        scope: Box<Scope>,
     ) -> Self {
         Value::new(V::Fn(VFn::Fn {
             args: args.into_iter().map(Into::into).collect(),

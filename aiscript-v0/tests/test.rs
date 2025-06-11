@@ -1500,12 +1500,12 @@ mod chain {
             )
             .unwrap();
         let line = ast.first().unwrap().clone();
-        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line {
-            assert_eq!(name, "c".to_string());
-            if let Expression::Prop(Prop { target, name, .. }) = *target {
-                assert_eq!(name, "b".to_string());
-                if let Expression::Identifier(Identifier { name, .. }) = *target {
-                    assert_eq!(name, "a".to_string());
+        if let Node::Expression(Expression::Prop(prop)) = line {
+            assert_eq!(prop.name, "c".to_string());
+            if let Expression::Prop(prop) = *prop.target {
+                assert_eq!(prop.name, "b".to_string());
+                if let Expression::Identifier(identifier) = *prop.target {
+                    assert_eq!(identifier.name, "a".to_string());
                     return;
                 }
             }
@@ -1523,16 +1523,14 @@ mod chain {
             )
             .unwrap();
         let line = ast.first().unwrap().clone();
-        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line {
-            assert_eq!(name, "b".to_string());
-            if let Expression::Index(Index { target, index, .. }) = *target {
-                if let (
-                    Expression::Identifier(Identifier { name, .. }),
-                    Expression::Num(Num { value, .. }),
-                ) = (*target, *index)
+        if let Node::Expression(Expression::Prop(prop)) = line {
+            assert_eq!(prop.name, "b".to_string());
+            if let Expression::Index(index) = *prop.target {
+                if let (Expression::Identifier(identifier), Expression::Num(num)) =
+                    (*index.target, *index.index)
                 {
-                    assert_eq!(name, "a".to_string());
-                    assert_eq!(value, 42.0);
+                    assert_eq!(identifier.name, "a".to_string());
+                    assert_eq!(num.value, 42.0);
                     return;
                 }
             }
@@ -1550,18 +1548,14 @@ mod chain {
             )
             .unwrap();
         let line = ast.first().unwrap().clone();
-        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line {
-            assert_eq!(name, "bar".to_string());
-            if let Expression::Call(Call { target, args, .. }) = *target {
-                if let Expression::Identifier(Identifier { name, .. }) = *target {
-                    assert_eq!(name, "foo".to_string());
-                    if let [
-                        Expression::Num(Num { value: arg1, .. }),
-                        Expression::Num(Num { value: arg2, .. }),
-                    ] = args[..]
-                    {
-                        assert_eq!(arg1, 42.0);
-                        assert_eq!(arg2, 57.0);
+        if let Node::Expression(Expression::Prop(prop)) = line {
+            assert_eq!(prop.name, "bar".to_string());
+            if let Expression::Call(call) = *prop.target {
+                if let Expression::Identifier(identifier) = *call.target {
+                    assert_eq!(identifier.name, "foo".to_string());
+                    if let [Expression::Num(num_1), Expression::Num(num_2)] = &call.args[..] {
+                        assert_eq!(num_1.value, 42.0);
+                        assert_eq!(num_2.value, 57.0);
                         return;
                     }
                 }
@@ -1580,16 +1574,16 @@ mod chain {
             )
             .unwrap();
         let line = ast.first().unwrap().clone();
-        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line {
-            assert_eq!(name, "e".to_string());
-            if let Expression::Prop(Prop { target, name, .. }) = *target {
-                assert_eq!(name, "d".to_string());
-                if let Expression::Prop(Prop { target, name, .. }) = *target {
-                    assert_eq!(name, "c".to_string());
-                    if let Expression::Prop(Prop { target, name, .. }) = *target {
-                        assert_eq!(name, "b".to_string());
-                        if let Expression::Identifier(Identifier { name, .. }) = *target {
-                            assert_eq!(name, "a".to_string());
+        if let Node::Expression(Expression::Prop(prop)) = line {
+            assert_eq!(prop.name, "e".to_string());
+            if let Expression::Prop(prop) = *prop.target {
+                assert_eq!(prop.name, "d".to_string());
+                if let Expression::Prop(prop) = *prop.target {
+                    assert_eq!(prop.name, "c".to_string());
+                    if let Expression::Prop(prop) = *prop.target {
+                        assert_eq!(prop.name, "b".to_string());
+                        if let Expression::Identifier(identifier) = *prop.target {
+                            assert_eq!(identifier.name, "a".to_string());
                             return;
                         }
                     }
@@ -1609,20 +1603,14 @@ mod chain {
             )
             .unwrap();
         let line = ast.first().unwrap().clone();
-        if let Node::Expression(Expression::Prop(Prop { target, name, .. })) = line.clone() {
-            assert_eq!(name, "d".to_string());
-            if let Expression::If(If {
-                cond,
-                then,
-                else_: Some(else_),
-                ..
-            }) = *target
-            {
+        if let Node::Expression(Expression::Prop(prop)) = line.clone() {
+            assert_eq!(prop.name, "d".to_string());
+            if let Expression::If(if_) = *prop.target {
                 if let (
                     Expression::Identifier(cond),
                     StatementOrExpression::Expression(Expression::Identifier(then)),
                     StatementOrExpression::Expression(Expression::Identifier(else_)),
-                ) = (*cond, *then, *else_)
+                ) = (*if_.cond, *if_.then, *if_.else_.unwrap())
                 {
                     assert_eq!(cond.name, "a".to_string());
                     assert_eq!(then.name, "b".to_string());
@@ -3238,20 +3226,19 @@ mod attribute {
                 "#,
             )
             .unwrap();
-        if let [Node::Statement(Statement::Definition(Definition { name, attr, .. }))] = &nodes[..]
-        {
-            assert_eq!(name, "onReceived");
-            if let Some(attr) = attr {
+        if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
+            assert_eq!(definition.name, "onReceived");
+            if let Some(attr) = &definition.attr {
                 if let [
                     Attribute {
                         name,
-                        value: Expression::Str(Str { value, .. }),
+                        value: Expression::Str(str),
                         ..
                     },
                 ] = &attr[..]
                 {
                     assert_eq!(name, "Event");
-                    assert_eq!(value, "Received");
+                    assert_eq!(str.value, "Received");
                     return;
                 }
             }
@@ -3273,39 +3260,39 @@ mod attribute {
                 "#,
             )
             .unwrap();
-        if let [Node::Statement(Statement::Definition(Definition { name, attr, .. }))] = &nodes[..]
-        {
-            assert_eq!(name, "createNote");
-            if let Some(attr) = attr {
+        if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
+            assert_eq!(definition.name, "createNote");
+            if let Some(attr) = &definition.attr {
                 if let [
                     Attribute {
                         name: name1,
-                        value: Expression::Obj(Obj { value: value1, .. }),
+                        value: Expression::Obj(obj),
                         ..
                     },
                     Attribute {
                         name: name2,
-                        value: Expression::Str(Str { value: value2, .. }),
+                        value: Expression::Str(str),
                         ..
                     },
                     Attribute {
                         name: name3,
-                        value: Expression::Bool(Bool { value: true, .. }),
+                        value: Expression::Bool(bool),
                         ..
                     },
                 ] = &attr[..]
                 {
                     assert_eq!(name1, "Endpoint");
-                    assert_eq!(name2, "Desc");
-                    assert_eq!(value2, "Create a note.");
-                    assert_eq!(name3, "Cat");
-                    if let [(key, Expression::Str(Str { value, .. }))] =
-                        value1.iter().collect::<Vec<(&String, &Expression)>>()[..]
+                    if let [(key, Expression::Str(str))] =
+                        obj.value.iter().collect::<Vec<(&String, &Expression)>>()[..]
                     {
                         assert_eq!(key, "path");
-                        assert_eq!(value, "/notes/create");
+                        assert_eq!(str.value, "/notes/create");
                         return;
-                    }
+                    };
+                    assert_eq!(name2, "Desc");
+                    assert_eq!(str.value, "Create a note.");
+                    assert_eq!(name3, "Cat");
+                    assert!(bool.value);
                 }
             }
         }
@@ -3322,10 +3309,9 @@ mod attribute {
                 "#,
             )
             .unwrap();
-        if let [Node::Statement(Statement::Definition(Definition { name, attr, .. }))] = &nodes[..]
-        {
-            assert_eq!(name, "data");
-            if let Some(attr) = attr {
+        if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
+            assert_eq!(definition.name, "data");
+            if let Some(attr) = &definition.attr {
                 if let [
                     Attribute {
                         name,
@@ -3355,16 +3341,12 @@ mod location {
                 "#,
             )
             .unwrap();
-        if let [
-            Node::Statement(Statement::Definition(Definition {
-                loc: Some(Loc { start, end }),
-                ..
-            })),
-        ] = &nodes[..]
-        {
-            assert_eq!(start.clone(), 3);
-            assert_eq!(end.clone(), 13);
-            return;
+        if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
+            if let Some(Loc { start, end }) = definition.loc {
+                assert_eq!(start.clone(), 3);
+                assert_eq!(end.clone(), 13);
+                return;
+            }
         }
         panic!();
     }
@@ -3381,16 +3363,12 @@ mod location {
                 "#,
             )
             .unwrap();
-        if let [
-            Node::Statement(Statement::Definition(Definition {
-                loc: Some(Loc { start, end }),
-                ..
-            })),
-        ] = &nodes[..]
-        {
-            assert_eq!(start.clone(), 23);
-            assert_eq!(end.clone(), 33);
-            return;
+        if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
+            if let Some(Loc { start, end }) = definition.loc {
+                assert_eq!(start.clone(), 23);
+                assert_eq!(end.clone(), 33);
+                return;
+            }
         }
         panic!();
     }

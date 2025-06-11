@@ -12,12 +12,10 @@ impl Visitor for TypeValidator {
         &self,
         statement: cst::Statement,
     ) -> Result<cst::Statement, crate::error::AiScriptError> {
-        if let cst::Statement::Definition(cst::Definition {
-            var_type: Some(var_type),
-            ..
-        }) = &statement
-        {
-            Type::try_from(var_type.clone())?;
+        if let cst::Statement::Definition(definition) = &statement {
+            if let Some(var_type) = definition.var_type.as_ref() {
+                Type::try_from(var_type.clone())?;
+            }
         };
         Ok(statement)
     }
@@ -26,12 +24,10 @@ impl Visitor for TypeValidator {
         &self,
         expression: cst::Expression,
     ) -> Result<cst::Expression, crate::error::AiScriptError> {
-        if let cst::Expression::Fn(cst::Fn_ {
-            ret_type: Some(ret_type),
-            ..
-        }) = &expression
-        {
-            Type::try_from(ret_type.clone())?;
+        if let cst::Expression::Fn(fn_) = &expression {
+            if let Some(ret_type) = fn_.ret_type.as_ref() {
+                Type::try_from(ret_type.clone())?;
+            }
         };
         Ok(expression)
     }

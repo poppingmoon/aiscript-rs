@@ -12,16 +12,16 @@ pub struct Loc {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
-    Namespace(Namespace),
-    Meta(Meta),
+    Namespace(Box<Namespace>),
+    Meta(Box<Meta>),
     Statement(Statement),
     Expression(Expression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DefinitionOrNamespace {
-    Definition(Definition),
-    Namespace(Namespace),
+    Definition(Box<Definition>),
+    Namespace(Box<Namespace>),
 }
 
 impl From<DefinitionOrNamespace> for Node {
@@ -58,16 +58,16 @@ pub enum StringOrExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    Definition(Definition),
-    Return(Return),
-    Each(Each),
-    For(For),
-    Loop(Loop),
-    Break(Break),
-    Continue(Continue),
-    Assign(Assign),
-    AddAssign(AddAssign),
-    SubAssign(SubAssign),
+    Definition(Box<Definition>),
+    Return(Box<Return>),
+    Each(Box<Each>),
+    For(Box<For>),
+    Loop(Box<Loop>),
+    Break(Box<Break>),
+    Continue(Box<Continue>),
+    Assign(Box<Assign>),
+    AddAssign(Box<AddAssign>),
+    SubAssign(Box<SubAssign>),
 }
 
 impl From<Statement> for Node {
@@ -78,25 +78,25 @@ impl From<Statement> for Node {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    If(If),
-    Fn(Fn),
-    Match(Match),
-    Block(Block),
-    Exists(Exists),
-    Tmpl(Tmpl),
-    Str(Str),
-    Num(Num),
-    Bool(Bool),
-    Null(Null),
-    Obj(Obj),
-    Arr(Arr),
-    Not(Not),
-    And(And),
-    Or(Or),
-    Identifier(Identifier),
-    Call(Call),
-    Index(Index),
-    Prop(Prop),
+    If(Box<If>),
+    Fn(Box<Fn>),
+    Match(Box<Match>),
+    Block(Box<Block>),
+    Exists(Box<Exists>),
+    Tmpl(Box<Tmpl>),
+    Str(Box<Str>),
+    Num(Box<Num>),
+    Bool(Box<Bool>),
+    Null(Box<Null>),
+    Obj(Box<Obj>),
+    Arr(Box<Arr>),
+    Not(Box<Not>),
+    And(Box<And>),
+    Or(Box<Or>),
+    Identifier(Box<Identifier>),
+    Call(Box<Call>),
+    Index(Box<Index>),
+    Prop(Box<Prop>),
 }
 
 impl From<Expression> for Node {

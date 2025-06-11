@@ -47,7 +47,7 @@ fn set_attribute_statement_or_expression(
     for node in nodes {
         match node {
             cst::StatementOrExpression::Statement(cst::Statement::Attribute(attribute)) => {
-                stocked_attrs.push(attribute);
+                stocked_attrs.push(*attribute);
             }
             cst::StatementOrExpression::Statement(cst::Statement::Definition(definition)) => {
                 let mut attr = definition.attr.unwrap_or_default();
@@ -55,17 +55,20 @@ fn set_attribute_statement_or_expression(
                 let definition = cst::Definition {
                     attr: Some(attr),
                     expr: if let cst::Expression::Fn(fn_) = definition.expr {
-                        cst::Expression::Fn(cst::Fn_ {
-                            children: set_attribute_statement_or_expression(fn_.children)?,
-                            ..fn_
-                        })
+                        cst::Expression::Fn(
+                            cst::Fn_ {
+                                children: set_attribute_statement_or_expression(fn_.children)?,
+                                ..*fn_
+                            }
+                            .into(),
+                        )
                     } else {
                         definition.expr
                     },
-                    ..definition
+                    ..*definition
                 };
                 result.push(cst::StatementOrExpression::Statement(
-                    cst::Statement::Definition(definition),
+                    cst::Statement::Definition(definition.into()),
                 ));
             }
             _ => {
@@ -75,16 +78,22 @@ fn set_attribute_statement_or_expression(
                 let node = match node {
                     cst::StatementOrExpression::Expression(expression) => {
                         cst::StatementOrExpression::Expression(match expression {
-                            cst::Expression::Fn(fn_) => cst::Expression::Fn(cst::Fn_ {
-                                children: set_attribute_statement_or_expression(fn_.children)?,
-                                ..fn_
-                            }),
-                            cst::Expression::Block(block) => cst::Expression::Block(cst::Block {
-                                statements: set_attribute_statement_or_expression(
-                                    block.statements,
-                                )?,
-                                ..block
-                            }),
+                            cst::Expression::Fn(fn_) => cst::Expression::Fn(
+                                cst::Fn_ {
+                                    children: set_attribute_statement_or_expression(fn_.children)?,
+                                    ..*fn_
+                                }
+                                .into(),
+                            ),
+                            cst::Expression::Block(block) => cst::Expression::Block(
+                                cst::Block {
+                                    statements: set_attribute_statement_or_expression(
+                                        block.statements,
+                                    )?,
+                                    ..*block
+                                }
+                                .into(),
+                            ),
                             _ => expression,
                         })
                     }

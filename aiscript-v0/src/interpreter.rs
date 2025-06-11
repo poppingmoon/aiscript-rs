@@ -160,28 +160,28 @@ impl Interpreter {
     pub fn collect_metadata(script: Vec<ast::Node>) -> IndexMap<Option<String>, Option<Value>> {
         fn node_to_value(node: ast::Expression) -> Option<Value> {
             match node {
-                ast::Expression::Arr(ast::Arr { value, .. }) => Some(Value::arr({
+                ast::Expression::Arr(arr) => Some(Value::arr({
                     let mut vec = Vec::new();
-                    for node in value {
+                    for node in arr.value {
                         if let Some(value) = node_to_value(node) {
                             vec.push(value);
                         }
                     }
                     vec
                 })),
-                ast::Expression::Bool(ast::Bool { value, .. }) => Some(Value::bool(value)),
+                ast::Expression::Bool(bool) => Some(Value::bool(bool.value)),
                 ast::Expression::Null(_) => Some(Value::null()),
-                ast::Expression::Num(ast::Num { value, .. }) => Some(Value::num(value)),
-                ast::Expression::Obj(ast::Obj { value, .. }) => Some(Value::obj({
-                    let mut obj = IndexMap::new();
-                    for (k, v) in value.into_iter() {
+                ast::Expression::Num(num) => Some(Value::num(num.value)),
+                ast::Expression::Obj(obj) => Some(Value::obj({
+                    let mut map = IndexMap::new();
+                    for (k, v) in obj.value.into_iter() {
                         if let Some(value) = node_to_value(v) {
-                            obj.insert(k, value);
+                            map.insert(k, value);
                         }
                     }
-                    obj
+                    map
                 })),
-                ast::Expression::Str(ast::Str { value, .. }) => Some(Value::str(value)),
+                ast::Expression::Str(str) => Some(Value::str(str.value)),
                 _ => None,
             }
         }
@@ -189,8 +189,8 @@ impl Interpreter {
         let mut meta = IndexMap::new();
 
         for node in script {
-            if let ast::Node::Meta(ast::Meta { name, value, .. }) = node {
-                meta.insert(name, node_to_value(value));
+            if let ast::Node::Meta(m) = node {
+                meta.insert(m.name, node_to_value(m.value));
             }
         }
 
@@ -225,10 +225,10 @@ impl Interpreter {
         for node in script {
             match node.into() {
                 ast::Node::Namespace(namespace) => {
-                    self.collect_ns_member(namespace.clone(), scope.clone())
-                        .await?;
+                    let loc = namespace.loc.clone();
+                    self.collect_ns_member(*namespace, scope.clone()).await?;
                     nodes.push(ast::StatementOrExpression::Expression(
-                        ast::Expression::Null(ast::Null { loc: namespace.loc }),
+                        ast::Expression::Null(ast::Null { loc }.into()),
                     ))
                 }
                 ast::Node::Statement(statement) => {
@@ -238,7 +238,7 @@ impl Interpreter {
                     nodes.push(ast::StatementOrExpression::Expression(expression))
                 }
                 ast::Node::Meta(meta) => nodes.push(ast::StatementOrExpression::Expression(
-                    ast::Expression::Null(ast::Null { loc: meta.loc }),
+                    ast::Expression::Null(ast::Null { loc: meta.loc }.into()),
                 )),
             }
         }
@@ -254,25 +254,21 @@ impl Interpreter {
             let ns_scope = scope.create_child_namespace_scope(ns.name, HashMap::new(), None);
             for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Namespace(ns) = node {
-                    self.collect_ns_member(ns.clone(), ns_scope.clone()).await?;
+                    self.collect_ns_member(*ns.clone(), ns_scope.clone())
+                        .await?;
                 }
             }
             for node in ns.members {
-                if let ast::DefinitionOrNamespace::Definition(ast::Definition {
-                    name,
-                    expr,
-                    mut_,
-                    ..
-                }) = node
-                {
-                    if mut_ {
+                if let ast::DefinitionOrNamespace::Definition(definition) = node {
+                    if definition.mut_ {
                         Err(AiScriptError::Internal(
                             "Namespaces cannot include mutable variable: {name}".to_string(),
                         ))?;
                     } else {
-                        let variable =
-                            Variable::Const(self.eval_expression(&expr, &ns_scope).await?);
-                        ns_scope.add(&name, variable)?;
+                        let variable = Variable::Const(
+                            self.eval_expression(&definition.expr, &ns_scope).await?,
+                        );
+                        ns_scope.add(&definition.name, variable)?;
                     }
                 }
             }
@@ -333,15 +329,9 @@ impl Interpreter {
             }
             Ok(match statement_or_expression {
                 ast::StatementOrExpression::Statement(statement) => match statement {
-                    ast::Statement::Definition(ast::Definition {
-                        name,
-                        expr,
-                        mut_,
-                        attr,
-                        ..
-                    }) => {
-                        let value = self.eval_expression(expr, scope).await?;
-                        let attr = match attr {
+                    ast::Statement::Definition(definition) => {
+                        let value = self.eval_expression(&definition.expr, scope).await?;
+                        let attr = match &definition.attr {
                             Some(attr) => {
                                 let mut attrs = Vec::new();
                                 for n_attr in attr {
@@ -355,8 +345,8 @@ impl Interpreter {
                             None => None,
                         };
                         scope.add(
-                            name,
-                            if *mut_ {
+                            &definition.name,
+                            if definition.mut_ {
                                 Variable::Mut(Value { attr, ..value })
                             } else {
                                 Variable::Const(Value { attr, ..value })
@@ -364,21 +354,19 @@ impl Interpreter {
                         )?;
                         Value::null()
                     }
-                    ast::Statement::Return(ast::Return { expr, .. }) => {
-                        let val = self.eval_expression(expr, scope).await?;
+                    ast::Statement::Return(return_) => {
+                        let val = self.eval_expression(&return_.expr, scope).await?;
                         Value::return_(val)
                     }
-                    ast::Statement::Each(ast::Each {
-                        items, for_, var, ..
-                    }) => {
-                        let items = self.eval_expression(items, scope).await?;
+                    ast::Statement::Each(each) => {
+                        let items = self.eval_expression(&each.items, scope).await?;
                         let items = <Vec<Value>>::try_from(items)?;
                         for item in items {
                             let scope = scope.create_child_scope(
-                                HashMap::from_iter([(var.clone(), Variable::Const(item))]),
+                                HashMap::from_iter([(each.var.clone(), Variable::Const(item))]),
                                 None,
                             );
-                            let v = self.eval(for_, &scope).await?;
+                            let v = self.eval(&each.for_, &scope).await?;
                             match *v.value {
                                 V::Break => {
                                     break;
@@ -391,20 +379,13 @@ impl Interpreter {
                         }
                         Value::null()
                     }
-                    ast::Statement::For(ast::For {
-                        times,
-                        from,
-                        var,
-                        to,
-                        for_,
-                        ..
-                    }) => {
-                        if let Some(times) = times {
+                    ast::Statement::For(for_) => {
+                        if let Some(times) = &for_.times {
                             let times = self.eval_expression(times, scope).await?;
                             let times = f64::try_from(times)?;
                             let mut i = 0.0;
                             while i < times {
-                                let v = self.eval(for_, scope).await?;
+                                let v = self.eval(&for_.for_, scope).await?;
                                 match *v.value {
                                     V::Break => {
                                         break;
@@ -416,7 +397,9 @@ impl Interpreter {
                                 }
                                 i += 1.0;
                             }
-                        } else if let (Some(from), Some(to), Some(var)) = (from, to, var) {
+                        } else if let (Some(from), Some(to), Some(var)) =
+                            (&for_.from, &for_.to, &for_.var)
+                        {
                             let from = self.eval_expression(from, scope).await?;
                             let to = self.eval_expression(to, scope).await?;
                             let from = f64::try_from(from)?;
@@ -430,7 +413,7 @@ impl Interpreter {
                                     )]),
                                     None,
                                 );
-                                let v = self.eval(for_, &scope).await?;
+                                let v = self.eval(&for_.for_, &scope).await?;
                                 match *v.value {
                                     V::Break => {
                                         break;
@@ -445,9 +428,12 @@ impl Interpreter {
                         }
                         Value::null()
                     }
-                    ast::Statement::Loop(ast::Loop { statements, .. }) => loop {
+                    ast::Statement::Loop(loop_) => loop {
                         let v = self
-                            .run(statements, &scope.create_child_scope(HashMap::new(), None))
+                            .run(
+                                &loop_.statements,
+                                &scope.create_child_scope(HashMap::new(), None),
+                            )
                             .await?;
                         match *v.value {
                             V::Break => {
@@ -461,25 +447,27 @@ impl Interpreter {
                     },
                     ast::Statement::Break(_) => Value::break_(),
                     ast::Statement::Continue(_) => Value::continue_(),
-                    ast::Statement::Assign(ast::Assign { expr, dest, .. }) => {
-                        let v = self.eval_expression(expr, scope).await?;
-                        self.assign(scope, dest, v).await?;
+                    ast::Statement::Assign(assign) => {
+                        let v = self.eval_expression(&assign.expr, scope).await?;
+                        self.assign(scope, &assign.dest, v).await?;
                         Value::null()
                     }
-                    ast::Statement::AddAssign(ast::AddAssign { expr, dest, .. }) => {
-                        let target = self.eval_expression(dest, scope).await?;
+                    ast::Statement::AddAssign(add_assign) => {
+                        let target = self.eval_expression(&add_assign.dest, scope).await?;
                         let target = f64::try_from(target)?;
-                        let v = self.eval_expression(expr, scope).await?;
+                        let v = self.eval_expression(&add_assign.expr, scope).await?;
                         let v = f64::try_from(v)?;
-                        self.assign(scope, dest, Value::num(target + v)).await?;
+                        self.assign(scope, &add_assign.dest, Value::num(target + v))
+                            .await?;
                         Value::null()
                     }
-                    ast::Statement::SubAssign(ast::SubAssign { expr, dest, .. }) => {
-                        let target = self.eval_expression(dest, scope).await?;
+                    ast::Statement::SubAssign(sub_assign) => {
+                        let target = self.eval_expression(&sub_assign.dest, scope).await?;
                         let target = f64::try_from(target)?;
-                        let v = self.eval_expression(expr, scope).await?;
+                        let v = self.eval_expression(&sub_assign.expr, scope).await?;
                         let v = f64::try_from(v)?;
-                        self.assign(scope, dest, Value::num(target - v)).await?;
+                        self.assign(scope, &sub_assign.dest, Value::num(target - v))
+                            .await?;
                         Value::null()
                     }
                 },
@@ -498,63 +486,58 @@ impl Interpreter {
     ) -> BoxFuture<'a, Result<Value, AiScriptError>> {
         async move {
             Ok(match expression {
-                ast::Expression::If(ast::If {
-                    cond,
-                    then,
-                    elseif,
-                    else_,
-                    ..
-                }) => {
-                    let cond = self.eval_expression(cond, scope).await?;
+                ast::Expression::If(if_) => {
+                    let cond = self.eval_expression(&if_.cond, scope).await?;
                     let cond = bool::try_from(cond)?;
                     if cond {
-                        self.eval(then, scope).await?
+                        self.eval(&if_.then, scope).await?
                     } else {
-                        for ast::Elseif { cond, then } in elseif {
+                        for ast::Elseif { cond, then } in &if_.elseif {
                             let cond = self.eval_expression(cond, scope).await?;
                             let cond = bool::try_from(cond)?;
                             if cond {
                                 return self.eval(then, scope).await;
                             }
                         }
-                        if let Some(else_) = else_ {
+                        if let Some(else_) = &if_.else_ {
                             self.eval(else_, scope).await?
                         } else {
                             Value::null()
                         }
                     }
                 }
-                ast::Expression::Fn(ast::Fn { args, children, .. }) => Value::fn_(
-                    args.iter().map(|arg| arg.name.to_string()),
-                    children.clone(),
-                    scope.clone(),
+                ast::Expression::Fn(fn_) => Value::fn_(
+                    fn_.args.iter().map(|arg| arg.name.to_string()),
+                    fn_.children.clone(),
+                    scope.clone().into(),
                 ),
-                ast::Expression::Match(ast::Match {
-                    about, qs, default, ..
-                }) => {
-                    let about = self.eval_expression(about, scope).await?;
-                    for ast::QA { q, a } in qs {
+                ast::Expression::Match(match_) => {
+                    let about = self.eval_expression(&match_.about, scope).await?;
+                    for ast::QA { q, a } in &match_.qs {
                         let q = self.eval_expression(q, scope).await?;
                         if about == q {
                             return self.eval(a, scope).await;
                         }
                     }
-                    if let Some(default) = default {
+                    if let Some(default) = &match_.default {
                         self.eval(default, scope).await?
                     } else {
                         Value::null()
                     }
                 }
-                ast::Expression::Block(ast::Block { statements, .. }) => {
-                    self.run(statements, &scope.create_child_scope(HashMap::new(), None))
-                        .await?
+                ast::Expression::Block(block) => {
+                    self.run(
+                        &block.statements,
+                        &scope.create_child_scope(HashMap::new(), None),
+                    )
+                    .await?
                 }
-                ast::Expression::Exists(ast::Exists { identifier, .. }) => {
-                    Value::bool(scope.exists(&identifier.name))
+                ast::Expression::Exists(exists) => {
+                    Value::bool(scope.exists(&exists.identifier.name))
                 }
-                ast::Expression::Tmpl(ast::Tmpl { tmpl, .. }) => {
+                ast::Expression::Tmpl(tmpl) => {
                     let mut str = String::new();
-                    for x in tmpl {
+                    for x in &tmpl.tmpl {
                         match x {
                             ast::StringOrExpression::String(x) => str += x,
                             ast::StringOrExpression::Expression(x) => {
@@ -565,31 +548,35 @@ impl Interpreter {
                     }
                     Value::str(str)
                 }
-                ast::Expression::Str(ast::Str { value, .. }) => Value::str(value),
-                ast::Expression::Num(ast::Num { value, .. }) => Value::num(*value),
-                ast::Expression::Bool(ast::Bool { value, .. }) => Value::bool(*value),
+                ast::Expression::Str(str) => Value::str(&str.value),
+                ast::Expression::Num(num) => Value::num(num.value),
+                ast::Expression::Bool(bool) => Value::bool(bool.value),
                 ast::Expression::Null(_) => Value::null(),
-                ast::Expression::Obj(ast::Obj { value, .. }) => {
-                    let mut obj = IndexMap::new();
-                    for (k, v) in value {
-                        obj.insert(k, self.eval_expression(v, scope).await?);
+                ast::Expression::Obj(obj) => {
+                    let mut map = IndexMap::new();
+                    for (k, v) in &obj.value {
+                        map.insert(k, self.eval_expression(v, scope).await?);
                     }
-                    Value::obj(obj)
+                    Value::obj(map)
                 }
-                ast::Expression::Arr(ast::Arr { value, .. }) => Value::arr(
-                    try_join_all(value.iter().map(|expr| self.eval_expression(expr, scope)))
-                        .await?,
+                ast::Expression::Arr(arr) => Value::arr(
+                    try_join_all(
+                        arr.value
+                            .iter()
+                            .map(|expr| self.eval_expression(expr, scope)),
+                    )
+                    .await?,
                 ),
-                ast::Expression::Not(ast::Not { expr, .. }) => {
-                    let v = self.eval_expression(expr, scope).await?;
+                ast::Expression::Not(not) => {
+                    let v = self.eval_expression(&not.expr, scope).await?;
                     let bool = bool::try_from(v)?;
                     Value::bool(!bool)
                 }
-                ast::Expression::And(ast::And { left, right, .. }) => {
+                ast::Expression::And(and) => {
                     let Value {
                         value: left_value,
                         attr,
-                    } = self.eval_expression(left, scope).await?;
+                    } = self.eval_expression(&and.left, scope).await?;
                     let left_value = bool::try_from(*left_value)?;
                     if !left_value {
                         Value {
@@ -600,7 +587,7 @@ impl Interpreter {
                         let Value {
                             value: right_value,
                             attr,
-                        } = self.eval_expression(right, scope).await?;
+                        } = self.eval_expression(&and.right, scope).await?;
                         let right_value = bool::try_from(*right_value)?;
                         Value {
                             value: Box::new(V::Bool(right_value)),
@@ -608,11 +595,11 @@ impl Interpreter {
                         }
                     }
                 }
-                ast::Expression::Or(ast::Or { left, right, .. }) => {
+                ast::Expression::Or(or) => {
                     let Value {
                         value: left_value,
                         attr,
-                    } = self.eval_expression(left, scope).await?;
+                    } = self.eval_expression(&or.left, scope).await?;
                     let left_value = bool::try_from(*left_value)?;
                     if left_value {
                         Value {
@@ -623,7 +610,7 @@ impl Interpreter {
                         let Value {
                             value: right_value,
                             attr,
-                        } = self.eval_expression(right, scope).await?;
+                        } = self.eval_expression(&or.right, scope).await?;
                         let right_value = bool::try_from(*right_value)?;
                         Value {
                             value: Box::new(V::Bool(right_value)),
@@ -631,18 +618,21 @@ impl Interpreter {
                         }
                     }
                 }
-                ast::Expression::Identifier(ast::Identifier { name, .. }) => scope.get(name)?,
-                ast::Expression::Call(ast::Call { target, args, .. }) => {
-                    let callee = self.eval_expression(target, scope).await?;
+                ast::Expression::Identifier(identifier) => scope.get(&identifier.name)?,
+                ast::Expression::Call(call) => {
+                    let callee = self.eval_expression(&call.target, scope).await?;
                     let callee = VFn::try_from(callee)?;
-                    let args =
-                        try_join_all(args.iter().map(|expr| self.eval_expression(expr, scope)))
-                            .await?;
+                    let args = try_join_all(
+                        call.args
+                            .iter()
+                            .map(|expr| self.eval_expression(expr, scope)),
+                    )
+                    .await?;
                     self.fn_(callee, args).await?
                 }
-                ast::Expression::Index(ast::Index { target, index, .. }) => {
-                    let target = self.eval_expression(target, scope).await?;
-                    let i = self.eval_expression(index, scope).await?;
+                ast::Expression::Index(index) => {
+                    let target = self.eval_expression(&index.target, scope).await?;
+                    let i = self.eval_expression(&index.index, scope).await?;
                     match *target.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
@@ -675,16 +665,16 @@ impl Interpreter {
                         )))?,
                     }
                 }
-                ast::Expression::Prop(ast::Prop { target, name, .. }) => {
-                    let value = self.eval_expression(target, scope).await?;
+                ast::Expression::Prop(prop) => {
+                    let value = self.eval_expression(&prop.target, scope).await?;
                     if let V::Obj(value) = *value.value {
-                        if let Some(value) = value.read().unwrap().get(name) {
+                        if let Some(value) = value.read().unwrap().get(&prop.name) {
                             value.clone()
                         } else {
                             Value::null()
                         }
                     } else {
-                        get_prim_prop(value, name)?
+                        get_prim_prop(value, &prop.name)?
                     }
                 }
             })
@@ -727,12 +717,10 @@ impl Interpreter {
     ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
             match dest {
-                ast::Expression::Identifier(ast::Identifier { name, .. }) => {
-                    scope.assign(name, value)?
-                }
-                ast::Expression::Index(ast::Index { target, index, .. }) => {
-                    let assignee = self.eval_expression(target, scope).await?;
-                    let i = self.eval_expression(index, scope).await?;
+                ast::Expression::Identifier(identifier) => scope.assign(&identifier.name, value)?,
+                ast::Expression::Index(index) => {
+                    let assignee = self.eval_expression(&index.target, scope).await?;
+                    let i = self.eval_expression(&index.index, scope).await?;
                     match *assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
@@ -756,21 +744,24 @@ impl Interpreter {
                         )))?,
                     }
                 }
-                ast::Expression::Prop(ast::Prop { target, name, .. }) => {
-                    let assignee = self.eval_expression(target, scope).await?;
+                ast::Expression::Prop(prop) => {
+                    let assignee = self.eval_expression(&prop.target, scope).await?;
                     let assignee = VObj::try_from(assignee)?;
-                    assignee.write().unwrap().insert(name.to_string(), value);
+                    assignee
+                        .write()
+                        .unwrap()
+                        .insert(prop.name.to_string(), value);
                 }
-                ast::Expression::Arr(ast::Arr { value: target, .. }) => {
+                ast::Expression::Arr(arr) => {
                     let value = <Vec<Value>>::try_from(value)?;
-                    try_join_all(target.iter().enumerate().map(|(index, item)| {
+                    try_join_all(arr.value.iter().enumerate().map(|(index, item)| {
                         self.assign(scope, item, value.get(index).cloned().unwrap_or_default())
                     }))
                     .await?;
                 }
-                ast::Expression::Obj(ast::Obj { value: target, .. }) => {
+                ast::Expression::Obj(obj) => {
                     let value = <IndexMap<String, Value>>::try_from(value)?;
-                    try_join_all(target.into_iter().map(|(key, item)| {
+                    try_join_all(obj.value.iter().map(|(key, item)| {
                         self.assign(scope, item, value.get(key).cloned().unwrap_or_default())
                     }))
                     .await?;

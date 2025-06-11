@@ -12,8 +12,8 @@ pub use crate::node::{Arg, Break, Continue, FnTypeSource, NamedTypeSource, TypeS
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
-    Namespace(Namespace),
-    Meta(Meta),
+    Namespace(Box<Namespace>),
+    Meta(Box<Meta>),
     Statement(Statement),
     Expression(Expression),
 }
@@ -21,92 +21,108 @@ pub enum Node {
 impl From<Node> for ast::Node {
     fn from(val: Node) -> Self {
         match val {
-            Node::Namespace(namespace) => ast::Node::Namespace(namespace.into()),
-            Node::Meta(meta) => ast::Node::Meta(meta.into()),
-            Node::Statement(statement) => ast::Node::Statement(statement.into()),
-            Node::Expression(expression) => ast::Node::Expression(expression.into()),
+            Node::Namespace(namespace) => {
+                ast::Node::Namespace(ast::Namespace::from(*namespace).into())
+            }
+            Node::Meta(meta) => ast::Node::Meta(ast::Meta::from(*meta).into()),
+            Node::Statement(statement) => ast::Node::Statement(ast::Statement::from(statement)),
+            Node::Expression(expression) => {
+                ast::Node::Expression(ast::Expression::from(expression))
+            }
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    Definition(Definition),
-    Return(Return),
-    Attribute(Attribute), // AST
-    Each(Each),
-    For(For),
-    Loop(Loop),
-    Break(Break),
-    Continue(Continue),
-    Assign(Assign),
-    AddAssign(AddAssign),
-    SubAssign(SubAssign),
+    Definition(Box<Definition>),
+    Return(Box<Return>),
+    Attribute(Box<Attribute>), // AST
+    Each(Box<Each>),
+    For(Box<For>),
+    Loop(Box<Loop>),
+    Break(Box<Break>),
+    Continue(Box<Continue>),
+    Assign(Box<Assign>),
+    AddAssign(Box<AddAssign>),
+    SubAssign(Box<SubAssign>),
 }
 
 impl From<Statement> for ast::Statement {
     fn from(val: Statement) -> Self {
         match val {
-            Statement::Definition(definition) => ast::Statement::Definition(definition.into()),
-            Statement::Return(return_) => ast::Statement::Return(return_.into()),
+            Statement::Definition(definition) => {
+                ast::Statement::Definition(ast::Definition::from(*definition).into())
+            }
+            Statement::Return(return_) => {
+                ast::Statement::Return(ast::Return::from(*return_).into())
+            }
             Statement::Attribute(_) => panic!(),
-            Statement::Each(each) => ast::Statement::Each(each.into()),
-            Statement::For(for_) => ast::Statement::For(for_.into()),
-            Statement::Loop(loop_) => ast::Statement::Loop(loop_.into()),
+            Statement::Each(each) => ast::Statement::Each(ast::Each::from(*each).into()),
+            Statement::For(for_) => ast::Statement::For(ast::For::from(*for_).into()),
+            Statement::Loop(loop_) => ast::Statement::Loop(ast::Loop::from(*loop_).into()),
             Statement::Break(break_) => ast::Statement::Break(break_),
             Statement::Continue(continue_) => ast::Statement::Continue(continue_),
-            Statement::Assign(assign) => ast::Statement::Assign(assign.into()),
-            Statement::AddAssign(addassign) => ast::Statement::AddAssign(addassign.into()),
-            Statement::SubAssign(subassign) => ast::Statement::SubAssign(subassign.into()),
+            Statement::Assign(assign) => ast::Statement::Assign(ast::Assign::from(*assign).into()),
+            Statement::AddAssign(addassign) => {
+                ast::Statement::AddAssign(ast::AddAssign::from(*addassign).into())
+            }
+            Statement::SubAssign(subassign) => {
+                ast::Statement::SubAssign(ast::SubAssign::from(*subassign).into())
+            }
         }
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    Not(Not),
-    And(And),
-    Or(Or),
-    If(If),
-    Fn(Fn_),
-    Match(Match),
-    Block(Block),
-    Exists(Exists),
-    Tmpl(Tmpl),
-    Str(Str),
-    Num(Num),
-    Bool(Bool),
-    Null(Null),
-    Obj(Obj),
-    Arr(Arr),
-    Identifier(Identifier),
-    Call(Call),   // IR
-    Index(Index), // IR
-    Prop(Prop),   // IR
+    Not(Box<Not>),
+    And(Box<And>),
+    Or(Box<Or>),
+    If(Box<If>),
+    Fn(Box<Fn_>),
+    Match(Box<Match>),
+    Block(Box<Block>),
+    Exists(Box<Exists>),
+    Tmpl(Box<Tmpl>),
+    Str(Box<Str>),
+    Num(Box<Num>),
+    Bool(Box<Bool>),
+    Null(Box<Null>),
+    Obj(Box<Obj>),
+    Arr(Box<Arr>),
+    Identifier(Box<Identifier>),
+    Call(Box<Call>),   // IR
+    Index(Box<Index>), // IR
+    Prop(Box<Prop>),   // IR
 }
 
 impl From<Expression> for ast::Expression {
     fn from(val: Expression) -> Self {
         match val {
-            Expression::Not(not) => ast::Expression::Not(not.into()),
-            Expression::And(and) => ast::Expression::And(and.into()),
-            Expression::Or(or) => ast::Expression::Or(or.into()),
-            Expression::If(if_) => ast::Expression::If(if_.into()),
-            Expression::Fn(fn_) => ast::Expression::Fn(fn_.into()),
-            Expression::Match(match_) => ast::Expression::Match(match_.into()),
-            Expression::Block(block) => ast::Expression::Block(block.into()),
-            Expression::Exists(exists) => ast::Expression::Exists(exists.into()),
-            Expression::Tmpl(tmpl) => ast::Expression::Tmpl(tmpl.into()),
-            Expression::Str(str) => ast::Expression::Str(str.into()),
-            Expression::Num(num) => ast::Expression::Num(num.into()),
-            Expression::Bool(bool) => ast::Expression::Bool(bool.into()),
-            Expression::Null(null) => ast::Expression::Null(null.into()),
-            Expression::Obj(obj) => ast::Expression::Obj(obj.into()),
-            Expression::Arr(arr) => ast::Expression::Arr(arr.into()),
-            Expression::Identifier(identifier) => ast::Expression::Identifier(identifier.into()),
-            Expression::Call(call) => ast::Expression::Call(call.into()),
-            Expression::Index(index) => ast::Expression::Index(index.into()),
-            Expression::Prop(prop) => ast::Expression::Prop(prop.into()),
+            Expression::Not(not) => ast::Expression::Not(ast::Not::from(*not).into()),
+            Expression::And(and) => ast::Expression::And(ast::And::from(*and).into()),
+            Expression::Or(or) => ast::Expression::Or(ast::Or::from(*or).into()),
+            Expression::If(if_) => ast::Expression::If(ast::If::from(*if_).into()),
+            Expression::Fn(fn_) => ast::Expression::Fn(ast::Fn::from(*fn_).into()),
+            Expression::Match(match_) => ast::Expression::Match(ast::Match::from(*match_).into()),
+            Expression::Block(block) => ast::Expression::Block(ast::Block::from(*block).into()),
+            Expression::Exists(exists) => {
+                ast::Expression::Exists(ast::Exists::from(*exists).into())
+            }
+            Expression::Tmpl(tmpl) => ast::Expression::Tmpl(ast::Tmpl::from(*tmpl).into()),
+            Expression::Str(str) => ast::Expression::Str(ast::Str::from(*str).into()),
+            Expression::Num(num) => ast::Expression::Num(ast::Num::from(*num).into()),
+            Expression::Bool(bool) => ast::Expression::Bool(ast::Bool::from(*bool).into()),
+            Expression::Null(null) => ast::Expression::Null(ast::Null::from(*null).into()),
+            Expression::Obj(obj) => ast::Expression::Obj(ast::Obj::from(*obj).into()),
+            Expression::Arr(arr) => ast::Expression::Arr(ast::Arr::from(*arr).into()),
+            Expression::Identifier(identifier) => {
+                ast::Expression::Identifier(ast::Identifier::from(*identifier).into())
+            }
+            Expression::Call(call) => ast::Expression::Call(ast::Call::from(*call).into()),
+            Expression::Index(index) => ast::Expression::Index(ast::Index::from(*index).into()),
+            Expression::Prop(prop) => ast::Expression::Prop(ast::Prop::from(*prop).into()),
         }
     }
 }
@@ -703,18 +719,18 @@ impl From<Prop> for ast::Prop {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DefinitionOrNamespace {
-    Definition(Definition),
-    Namespace(Namespace),
+    Definition(Box<Definition>),
+    Namespace(Box<Namespace>),
 }
 
 impl From<DefinitionOrNamespace> for ast::DefinitionOrNamespace {
     fn from(val: DefinitionOrNamespace) -> Self {
         match val {
             DefinitionOrNamespace::Definition(definition) => {
-                ast::DefinitionOrNamespace::Definition(definition.into())
+                ast::DefinitionOrNamespace::Definition(ast::Definition::from(*definition).into())
             }
             DefinitionOrNamespace::Namespace(namespace) => {
-                ast::DefinitionOrNamespace::Namespace(namespace.into())
+                ast::DefinitionOrNamespace::Namespace(ast::Namespace::from(*namespace).into())
             }
         }
     }

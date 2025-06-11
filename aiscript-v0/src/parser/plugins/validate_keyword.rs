@@ -73,16 +73,19 @@ impl Visitor for KeywordValidator {
         statement: cst::Statement,
     ) -> Result<cst::Statement, AiScriptError> {
         match &statement {
-            cst::Statement::Definition(cst::Definition { name, .. })
-            | cst::Statement::Attribute(cst::Attribute { name, .. }) => {
-                if RESERVED_WORD.contains(&name.as_str()) {
-                    Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
-                } else {
-                    Ok(statement)
-                }
-            }
-            _ => Ok(statement),
+            cst::Statement::Definition(definition) => Some(&definition.name),
+            cst::Statement::Attribute(attribute) => Some(&attribute.name),
+            _ => None,
         }
+        .map(|name| {
+            if RESERVED_WORD.contains(&name.as_str()) {
+                Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
+            } else {
+                Ok(())
+            }
+        })
+        .unwrap_or(Ok(()))
+        .map(|_| statement)
     }
 
     fn callback_expression(
@@ -90,15 +93,17 @@ impl Visitor for KeywordValidator {
         expression: cst::Expression,
     ) -> Result<cst::Expression, AiScriptError> {
         match &expression {
-            cst::Expression::Identifier(cst::Identifier { name, .. }) => {
-                if RESERVED_WORD.contains(&name.as_str()) {
-                    Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
+            cst::Expression::Identifier(identifier) => {
+                if RESERVED_WORD.contains(&identifier.name.as_str()) {
+                    Err(AiScriptSyntaxError::ReservedWord(
+                        identifier.name.to_string(),
+                    ))?
                 } else {
                     Ok(expression)
                 }
             }
-            cst::Expression::Fn(cst::Fn_ { args, .. }) => {
-                for arg in args {
+            cst::Expression::Fn(fn_) => {
+                for arg in &fn_.args {
                     if RESERVED_WORD.contains(&arg.name.as_str()) {
                         Err(AiScriptSyntaxError::ReservedWord(arg.name.to_string()))?
                     }

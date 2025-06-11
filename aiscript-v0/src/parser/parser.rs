@@ -42,33 +42,33 @@ peg::parser! {
         // list of global statements
 
         rule global_statement() -> Node
-            = namespace:namespace() { Node::Namespace(namespace) }  // "::"
-            / meta:meta() { Node::Meta(meta) }                      // "###"
+            = namespace:namespace() { Node::Namespace(namespace.into()) }  // "::"
+            / meta:meta() { Node::Meta(meta.into()) }                      // "###"
             / statement:statement() { statement.into() }
 
         // list of namespace statement
 
         rule namespace_statement() -> DefinitionOrNamespace
-            = var_def:var_def() { DefinitionOrNamespace::Definition(var_def) }
-            / fn_def:fn_def() { DefinitionOrNamespace::Definition(fn_def) }
-            / namespace:namespace() { DefinitionOrNamespace::Namespace(namespace) }
+            = var_def:var_def() { DefinitionOrNamespace::Definition(var_def.into()) }
+            / fn_def:fn_def() { DefinitionOrNamespace::Definition(fn_def.into()) }
+            / namespace:namespace() { DefinitionOrNamespace::Namespace(namespace.into()) }
 
         // list of statement
 
         rule statement() -> StatementOrExpression
-            = var_def:var_def() { StatementOrExpression::Statement(Statement::Definition(var_def)) }         // "let" NAME | "var" NAME
-            / fn_def:fn_def() { StatementOrExpression::Statement(Statement::Definition(fn_def)) }            // "@"
-            / out:out() { StatementOrExpression::Expression(Expression::Identifier(out)) }                   // "<:"
-            / return_:return() { StatementOrExpression::Statement(Statement::Return(return_)) }              // "return"
-            / attr:attr() { StatementOrExpression::Statement(Statement::Attribute(attr)) }                   // "+"
-            / each:each() { StatementOrExpression::Statement(Statement::Each(each)) }                        // "each"
-            / for_:for() { StatementOrExpression::Statement(Statement::For(for_)) }                          // "for"
-            / loop_:loop() { StatementOrExpression::Statement(Statement::Loop(loop_)) }                      // "loop"
-            / break_:break() { StatementOrExpression::Statement(Statement::Break(break_)) }                  // "break"
-            / continue_:continue() { StatementOrExpression::Statement(Statement::Continue(continue_)) }      // "continue"
-            / add_assign:add_assign() { StatementOrExpression::Statement(Statement::AddAssign(add_assign)) } // Expr "+="
-            / sub_assign:sub_assign() { StatementOrExpression::Statement(Statement::SubAssign(sub_assign)) } // Expr "-="
-            / assign:assign() { StatementOrExpression::Statement(Statement::Assign(assign)) }                // Expr "="
+            = var_def:var_def() { StatementOrExpression::Statement(Statement::Definition(var_def.into())) }         // "let" NAME | "var" NAME
+            / fn_def:fn_def() { StatementOrExpression::Statement(Statement::Definition(fn_def.into())) }            // "@"
+            / out:out() { StatementOrExpression::Expression(Expression::Identifier(out.into())) }                   // "<:"
+            / return_:return() { StatementOrExpression::Statement(Statement::Return(return_.into())) }              // "return"
+            / attr:attr() { StatementOrExpression::Statement(Statement::Attribute(attr.into())) }                   // "+"
+            / each:each() { StatementOrExpression::Statement(Statement::Each(each.into())) }                        // "each"
+            / for_:for() { StatementOrExpression::Statement(Statement::For(for_.into())) }                          // "for"
+            / loop_:loop() { StatementOrExpression::Statement(Statement::Loop(loop_.into())) }                      // "loop"
+            / break_:break() { StatementOrExpression::Statement(Statement::Break(break_.into())) }                  // "break"
+            / continue_:continue() { StatementOrExpression::Statement(Statement::Continue(continue_.into())) }      // "continue"
+            / add_assign:add_assign() { StatementOrExpression::Statement(Statement::AddAssign(add_assign.into())) } // Expr "+="
+            / sub_assign:sub_assign() { StatementOrExpression::Statement(Statement::SubAssign(sub_assign.into())) } // Expr "-="
+            / assign:assign() { StatementOrExpression::Statement(Statement::Assign(assign.into())) }                // Expr "="
             / expr:expr() { StatementOrExpression::Expression(expr) }
 
         // list of expression
@@ -85,7 +85,7 @@ peg::parser! {
                                 operator_loc: Loc{ start, end: end - 1 },
                                 chain: None,
                                 loc: None,
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -99,7 +99,7 @@ peg::parser! {
                                 operator_loc: Loc{ start, end: end - 1 },
                                 chain: None,
                                 loc: None,
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -117,7 +117,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -134,7 +134,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -152,7 +152,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -169,7 +169,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -186,7 +186,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -203,7 +203,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -221,7 +221,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -238,7 +238,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -256,7 +256,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -273,7 +273,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -290,7 +290,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -307,7 +307,7 @@ peg::parser! {
                                     })]
                                 ),
                                 loc: Some(Loc{ start, end: end - 1 }),
-                            }
+                            }.into()
                         ),
                         true,
                     )
@@ -329,55 +329,55 @@ peg::parser! {
                                 }
                                 chain
                             }),
-                            ..identifier
-                        }
+                            ..*identifier
+                        }.into()
                     ),
                     (Expression::And(and), true) => Expression::And(
                         And {
                             loc: and.loc.clone().or(Some(Loc { start, end })),
-                            ..and
-                        }
+                            ..*and
+                        }.into()
                     ),
                     (Expression::Or(or), true) => Expression::Or(
                         Or {
                             loc: or.loc.clone().or(Some(Loc { start, end })),
-                            ..or
-                        }
+                            ..*or
+                        }.into()
                     ),
                     (expression, _) => expression,
                 }
             }
 
         rule expr2() -> Expression
-            = if_:if() { Expression::If(if_) } // "if"
-            / fn_:fn() { Expression::Fn(fn_) } // "@("
+            = if_:if() { Expression::If(if_.into()) } // "if"
+            / fn_:fn() { Expression::Fn(fn_.into()) } // "@("
             / chain()                          // Expr3 "(" | Expr3 "[" | Expr3 "."
             / expr3()
 
         rule expr3() -> Expression
-            = match_:match() { Expression::Match(match_) }                   // "match"
-            / eval:eval() { Expression::Block(eval) }                        // "eval"
-            / exists:exists() { Expression::Exists(exists) }                 // "exists"
-            / tmpl:tmpl() { Expression::Tmpl(tmpl) }                         // "`"
-            / str:str() { Expression::Str(str) }                             // "\""
-            / num:num() { Expression::Num(num) }                             // "+" | "-" | "1"~"9"
-            / bool:bool() { Expression::Bool(bool) }                         // "true" | "false"
-            / null:null() { Expression::Null(null) }                         // "null"
-            / obj:obj() { Expression::Obj(obj) }                             // "{"
-            / arr:arr() { Expression::Arr(arr) }                             // "["
-            / not:not() { Expression::Not(not) }                             // "!"
-            / identifier:identifier() { Expression::Identifier(identifier) } // NAME_WITH_NAMESPACE
+            = match_:match() { Expression::Match(match_.into()) }                   // "match"
+            / eval:eval() { Expression::Block(eval.into()) }                        // "eval"
+            / exists:exists() { Expression::Exists(exists.into()) }                 // "exists"
+            / tmpl:tmpl() { Expression::Tmpl(tmpl.into()) }                         // "`"
+            / str:str() { Expression::Str(str.into()) }                             // "\""
+            / num:num() { Expression::Num(num.into()) }                             // "+" | "-" | "1"~"9"
+            / bool:bool() { Expression::Bool(bool.into()) }                         // "true" | "false"
+            / null:null() { Expression::Null(null.into()) }                         // "null"
+            / obj:obj() { Expression::Obj(obj.into()) }                             // "{"
+            / arr:arr() { Expression::Arr(arr.into()) }                             // "["
+            / not:not() { Expression::Not(not.into()) }                             // "!"
+            / identifier:identifier() { Expression::Identifier(identifier.into()) } // NAME_WITH_NAMESPACE
             / "(" _* e:expr() _* ")" { e }
 
         // list of static literal
 
         rule static_literal() -> Expression
-            = num:num() {Expression::Num(num)}
-            / str:str() {Expression::Str(str)}
-            / bool:bool() {Expression::Bool(bool)}
-            / static_arr:static_arr() {Expression::Arr(static_arr)}
-            / static_obj:static_obj() {Expression::Obj(static_obj)}
-            / null:null() {Expression::Null(null)}
+            = num:num() {Expression::Num(num.into())}
+            / str:str() {Expression::Str(str.into())}
+            / bool:bool() {Expression::Bool(bool.into())}
+            / static_arr:static_arr() {Expression::Arr(static_arr.into())}
+            / static_obj:static_obj() {Expression::Obj(static_obj.into())}
+            / null:null() {Expression::Null(null.into())}
 
         //
         // global statements ---------------------------------------------------------------------
@@ -465,7 +465,7 @@ peg::parser! {
             = start:position!() "#[" _* name:name() value:(_* value:static_literal() { value })? _* "]" end:position!() {
                 Attribute {
                     name,
-                    value: value.unwrap_or_else(|| Expression::Bool(Bool { value: true, chain: None, loc: None})),
+                    value: value.unwrap_or_else(|| Expression::Bool(Bool { value: true, chain: None, loc: None}.into())),
                     loc: Some(Loc{ start, end: end - 1 })
                 }
             }
@@ -496,7 +496,7 @@ peg::parser! {
         = start:position!() "for" _* "(" "let" _+ varn:name() _* from_:("=" _* v:expr() { v })? ","? _* to:expr() ")" _* x:block_or_statement() end:position!() {
             For {
                 var: Some(varn),
-                from: Some(from_.unwrap_or_else(|| Expression::Num(Num { value: 0.0, chain: None, loc: None }))),
+                from: Some(from_.unwrap_or_else(|| Expression::Num(Num { value: 0.0, chain: None, loc: None }.into()))),
                 to: Some(to),
                 times: None,
                 for_: x.into(),
@@ -506,7 +506,7 @@ peg::parser! {
         / start:position!() "for" _+ "let" _+ varn:name() _* from_:("=" _* v:expr() { v })? ","? _* to:expr() _+ x:block_or_statement() end:position!() {
             For {
                 var: Some(varn),
-                from: Some(from_.unwrap_or_else(|| Expression::Num(Num { value: 0.0, chain: None, loc: None }))),
+                from: Some(from_.unwrap_or_else(|| Expression::Num(Num { value: 0.0, chain: None, loc: None }.into()))),
                 to: Some(to),
                 times: None,
                 for_: x.into(),
@@ -620,128 +620,128 @@ peg::parser! {
                         c.extend(chain);
                         Expression::Not(Not {
                             chain: Some(c),
-                            ..not
-                        })
+                            ..*not
+                        }.into())
                     },
                     Expression::And(and) => {
                         let mut c = and.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::And(And {
                             chain: Some(c),
-                            ..and
-                        })
+                            ..*and
+                        }.into())
                     },
                     Expression::Or(or) => {
                         let mut c = or.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Or(Or {
                             chain: Some(c),
-                            ..or
-                        })
+                            ..*or
+                        }.into())
                     },
                     Expression::If(if_) => {
                         let mut c = if_.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::If(If {
                             chain: Some(c),
-                            ..if_
-                        })
+                            ..*if_
+                        }.into())
                     },
                     Expression::Fn(fn_) => {
                         let mut c = fn_.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Fn(Fn_ {
                             chain: Some(c),
-                            ..fn_
-                        })
+                            ..*fn_
+                        }.into())
                     },
                     Expression::Match(match_) => {
                         let mut c = match_.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Match(Match {
                             chain: Some(c),
-                            ..match_
-                        })
+                            ..*match_
+                        }.into())
                     },
                     Expression::Block(block) =>  {
                         let mut c = block.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Block(Block {
                             chain: Some(c),
-                            ..block
-                        })
+                            ..*block
+                        }.into())
                     },
                     Expression::Exists(exists) =>  {
                         let mut c = exists.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Exists(Exists {
                             chain: Some(c),
-                            ..exists
-                        })
+                            ..*exists
+                        }.into())
                     },
                     Expression::Tmpl(tmpl) =>  {
                         let mut c = tmpl.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Tmpl(Tmpl {
                             chain: Some(c),
-                            ..tmpl
-                        })
+                            ..*tmpl
+                        }.into())
                     },
                     Expression::Str(str) =>  {
                         let mut c = str.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Str(Str {
                             chain: Some(c),
-                            ..str
-                        })
+                            ..*str
+                        }.into())
                     },
                     Expression::Num(num) =>  {
                         let mut c = num.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Num(Num {
                             chain: Some(c),
-                            ..num
-                        })
+                            ..*num
+                        }.into())
                     },
                     Expression::Bool(bool) =>  {
                         let mut c = bool.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Bool(Bool {
                             chain: Some(c),
-                            ..bool
-                        })
+                            ..*bool
+                        }.into())
                     },
                     Expression::Null(null) =>  {
                         let mut c = null.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Null(Null {
                             chain: Some(c),
-                            ..null
-                        })
+                            ..*null
+                        }.into())
                     },
                     Expression::Obj(obj) =>  {
                         let mut c = obj.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Obj(Obj {
                             chain: Some(c),
-                            ..obj
-                        })
+                            ..*obj
+                        }.into())
                     },
                     Expression::Arr(arr) =>  {
                         let mut c = arr.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Arr(Arr {
                             chain: Some(c),
-                            ..arr
-                        })
+                            ..*arr
+                        }.into())
                     },
                     Expression::Identifier(identifier) => {
                         let mut c = identifier.chain.unwrap_or_default();
                         c.extend(chain);
                         Expression::Identifier(Identifier {
                             chain: Some(c),
-                            ..identifier
-                        })
+                            ..*identifier
+                        }.into())
                     },
                     Expression::Call(_) => e,
                     Expression::Index(_) => e,
@@ -1044,7 +1044,7 @@ peg::parser! {
                             children: content.unwrap_or_default(),
                             chain: None,
                             loc: Some(Loc{ start, end: end - 1 }),
-                        },
+                        }.into(),
                     ),
                     var_type: None,
                     mut_: false,
@@ -1156,7 +1156,7 @@ peg::parser! {
                             statements: s.unwrap_or_default(),
                             chain: None,
                             loc: Some(Loc{ start, end: end - 1 })
-                        }
+                        }.into()
                     )
                 )
             }
