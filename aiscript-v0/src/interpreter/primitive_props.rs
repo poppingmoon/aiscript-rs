@@ -872,8 +872,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                         if index == target_len {
                             Value::null()
                         } else {
-                            let removed = target.write().unwrap().remove(index);
-                            removed
+                            target.write().unwrap().remove(index)
                         }
                     })
                 }
