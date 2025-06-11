@@ -1,2 +1,3 @@
 [workspace]
 members = ["aiscript", "aiscript-v0"]
+resolver = "3"
