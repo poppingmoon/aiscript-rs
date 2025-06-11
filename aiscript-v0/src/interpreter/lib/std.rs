@@ -550,8 +550,139 @@ pub fn std() -> HashMap<String, Value> {
             async move {
                 let mut args = args.into_iter();
                 let v = String::try_from(args.next().unwrap_or_default())?;
-                let date = chrono::DateTime::parse_from_rfc3339(&v)
-                    .map_or(f64::NAN, |date| date.timestamp_millis() as f64);
+                let v = v.trim();
+                let date = v
+                    .parse::<chrono::DateTime<chrono::FixedOffset>>()
+                    .or_else(|_| chrono::DateTime::parse_from_rfc2822(v))
+                    .ok()
+                    .map(|date| date.timestamp_millis())
+                    .or_else(|| {
+                        Some(
+                            v.parse::<chrono::NaiveDateTime>()
+                                .ok()?
+                                .and_local_timezone(chrono::Local)
+                                .earliest()?
+                                .timestamp_millis(),
+                        )
+                    })
+                    .or_else(|| {
+                        if v.is_empty() {
+                            None?
+                        }
+                        let mut numbers: [u32; 9] = [0, 0, 0, 0, 0, 0, 1, 1, 0];
+                        let mut index = 0;
+                        let mut previous_byte = b' ';
+                        let mut is_east = true;
+                        for b in v.bytes() {
+                            if index > 8 {
+                                None?
+                            }
+                            match b {
+                                b'0' => numbers[index] *= 10,
+                                b'1' => numbers[index] = numbers[index] * 10 + 1,
+                                b'2' => numbers[index] = numbers[index] * 10 + 2,
+                                b'3' => numbers[index] = numbers[index] * 10 + 3,
+                                b'4' => numbers[index] = numbers[index] * 10 + 4,
+                                b'5' => numbers[index] = numbers[index] * 10 + 5,
+                                b'6' => numbers[index] = numbers[index] * 10 + 6,
+                                b'7' => numbers[index] = numbers[index] * 10 + 7,
+                                b'8' => numbers[index] = numbers[index] * 10 + 8,
+                                b'9' => numbers[index] = numbers[index] * 10 + 9,
+                                b'-' | b'.' | b'/' if index < 2 && numbers[index] > 0 => index += 1,
+                                b'-' | b'.' | b'/'
+                                    if index <= 2 && previous_byte.is_ascii_whitespace() => {}
+                                b'T' | b't' | b'_' if index == 2 && numbers[2] > 0 => index += 1,
+                                b'T' | b't' | b'_'
+                                    if index == 3 && previous_byte.is_ascii_whitespace() => {}
+                                b if index < 3 && b.is_ascii_whitespace() => {
+                                    if previous_byte.is_ascii_digit() {
+                                        index += 1
+                                    }
+                                }
+                                b':' if (index == 3 || index == 4 || index == 7)
+                                    && (previous_byte.is_ascii_digit()
+                                        || previous_byte.is_ascii_whitespace()) =>
+                                {
+                                    index += 1
+                                }
+                                b'.' if index == 5 && previous_byte.is_ascii_digit() => index += 1,
+                                b'+' if (4..=6).contains(&index)
+                                    && (previous_byte.is_ascii_digit()
+                                        || previous_byte.is_ascii_whitespace()) =>
+                                {
+                                    index = 7
+                                }
+                                b'-' if (4..=6).contains(&index)
+                                    && (previous_byte.is_ascii_digit()
+                                        || previous_byte.is_ascii_whitespace()) =>
+                                {
+                                    is_east = false;
+                                    index = 7
+                                }
+                                b'Z' | b'z'
+                                    if (4..=6).contains(&index)
+                                        && (previous_byte.is_ascii_digit()
+                                            || previous_byte.is_ascii_whitespace()) =>
+                                {
+                                    index = 10
+                                }
+                                b if b.is_ascii_whitespace() => {}
+                                _ => None?,
+                            };
+                            previous_byte = b;
+                        }
+                        let (year, month, day) = if index < 2 {
+                            match numbers[0] {
+                                100.. => (numbers[0], numbers[1].max(1), 1),
+                                50.. => (numbers[0] + 1900, numbers[1].max(1), 1),
+                                32.. => (numbers[0] + 2000, numbers[1].max(1), 1),
+                                1..=12 => (2001, numbers[0].max(1), numbers[1].max(1)),
+                                _ => None?,
+                            }
+                        } else if numbers[0] >= 100 {
+                            (numbers[0], numbers[1].max(1), numbers[2].max(1))
+                        } else {
+                            (numbers[2], numbers[0].max(1), numbers[1].max(1))
+                        };
+                        let time = chrono::NaiveDate::from_ymd_opt(year as i32, month, day)?;
+                        let hour = numbers[3];
+                        let minute = numbers[4];
+                        let second = numbers[5];
+                        let millis_digits = numbers[6].ilog10();
+                        let millisecond = numbers[6] - 10_u32.pow(millis_digits);
+                        let millisecond = if millis_digits > 3 {
+                            millisecond / 10_u32.pow(millis_digits - 3)
+                        } else {
+                            millisecond * 10_u32.pow(3 - millis_digits)
+                        };
+                        let time = time.and_hms_milli_opt(hour, minute, second, millisecond)?;
+                        let tz = match index {
+                            ..3 => chrono::FixedOffset::east_opt(0)?,
+                            3..7 => *chrono::Local::now().offset(),
+                            7 => {
+                                let tz_digits = numbers[7].ilog10();
+                                let tz = numbers[7] - 10_u32.pow(tz_digits);
+                                let secs = if tz_digits >= 3 {
+                                    let hour = tz / 100;
+                                    let minutes = tz - hour * 100;
+                                    hour * 3600 + minutes * 60
+                                } else {
+                                    tz * 3600
+                                } as i32;
+                                let secs = if is_east { secs } else { -secs };
+                                chrono::FixedOffset::east_opt(secs)?
+                            }
+                            _ => {
+                                let hour = numbers[7] - 10_u32.pow(numbers[7].ilog10());
+                                let secs = (hour * 3600 + numbers[8] * 60) as i32;
+                                let secs = if is_east { secs } else { -secs };
+                                chrono::FixedOffset::east_opt(secs)?
+                            }
+                        };
+                        let time = time.and_local_timezone(tz).earliest()?;
+                        Some(time.timestamp_millis())
+                    })
+                    .map_or(f64::NAN, |date| date as f64);
                 Ok(Value::num(date))
             }
             .boxed()

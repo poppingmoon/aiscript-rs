@@ -5938,6 +5938,28 @@ mod std {
             .await
             .unwrap();
         }
+
+        #[tokio::test]
+        async fn parse() {
+            test(
+                r#"
+                <: [
+                    '01 Jan 1970 00:00:00 GMT'
+                    '1970-01-01'
+                    '1970-01-01T00:00:00.000Z'
+                    '1970-01-01T00:00:00.000+00:00'
+                    'hoge'
+                ].map(Date:parse)
+                "#,
+                |res| {
+                    let res = <Vec<Value>>::try_from(res).unwrap();
+                    assert_eq!(res[..4], vec![num(0), num(0), num(0), num(0)]);
+                    assert!(f64::try_from(res[4].clone()).unwrap().is_nan())
+                },
+            )
+            .await
+            .unwrap();
+        }
     }
 }
 
