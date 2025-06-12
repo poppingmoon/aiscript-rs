@@ -115,7 +115,7 @@ impl Interpreter {
         Interpreter {
             step_count: Arc::new(AtomicUsize::new(0)),
             stop: Arc::new(AtomicBool::new(false)),
-            scope: Scope::new(states, None),
+            scope: Scope::new(states),
             abort_handlers: Arc::new(Mutex::new(tokio::task::JoinSet::new())),
             err: match err {
                 Some(err) => Some(Arc::new(err)),
@@ -252,7 +252,7 @@ impl Interpreter {
         scope: Scope,
     ) -> BoxFuture<'_, Result<(), AiScriptError>> {
         async move {
-            let ns_scope = scope.create_child_namespace_scope(ns.name, HashMap::new(), None);
+            let ns_scope = scope.create_child_namespace_scope(ns.name, HashMap::new());
             for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Namespace(ns) = node {
                     self.collect_ns_member(*ns.clone(), ns_scope.clone())
@@ -297,7 +297,7 @@ impl Interpreter {
                 )
                 .collect();
                 async move {
-                    self.run(&statements, &scope.create_child_scope(args, None))
+                    self.run(&statements, &scope.create_child_scope(args))
                         .map(|r| r.map(unwrap_ret))
                         .await
                 }
@@ -365,10 +365,10 @@ impl Interpreter {
                         let items = self.eval_expression(&each.items, scope).await?;
                         let items = <Vec<Value>>::try_from(items)?;
                         for item in items {
-                            let scope = scope.create_child_scope(
-                                HashMap::from_iter([(each.var.clone(), Variable::Const(item))]),
-                                None,
-                            );
+                            let scope = scope.create_child_scope(HashMap::from_iter([(
+                                each.var.clone(),
+                                Variable::Const(item),
+                            )]));
                             let v = self.eval(&each.for_, &scope).await?;
                             match *v.value {
                                 V::Break => {
@@ -409,13 +409,10 @@ impl Interpreter {
                             let to = f64::try_from(to)?;
                             let mut i = from;
                             while i < from + to {
-                                let scope = scope.create_child_scope(
-                                    HashMap::from_iter([(
-                                        var.clone(),
-                                        Variable::Const(Value::num(i)),
-                                    )]),
-                                    None,
-                                );
+                                let scope = scope.create_child_scope(HashMap::from_iter([(
+                                    var.clone(),
+                                    Variable::Const(Value::num(i)),
+                                )]));
                                 let v = self.eval(&for_.for_, &scope).await?;
                                 match *v.value {
                                     V::Break => {
@@ -433,10 +430,7 @@ impl Interpreter {
                     }
                     ast::Statement::Loop(loop_) => loop {
                         let v = self
-                            .run(
-                                &loop_.statements,
-                                &scope.create_child_scope(HashMap::new(), None),
-                            )
+                            .run(&loop_.statements, &scope.create_child_scope(HashMap::new()))
                             .await?;
                         match *v.value {
                             V::Break => {
@@ -529,11 +523,8 @@ impl Interpreter {
                     }
                 }
                 ast::Expression::Block(block) => {
-                    self.run(
-                        &block.statements,
-                        &scope.create_child_scope(HashMap::new(), None),
-                    )
-                    .await?
+                    self.run(&block.statements, &scope.create_child_scope(HashMap::new()))
+                        .await?
                 }
                 ast::Expression::Exists(exists) => {
                     Value::bool(scope.exists(&exists.identifier.name).await)

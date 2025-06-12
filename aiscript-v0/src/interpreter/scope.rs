@@ -7,44 +7,34 @@ use crate::error::{AiScriptError, AiScriptRuntimeError};
 
 use super::{value::Value, variable::Variable};
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Scope {
     parent: Option<Box<Scope>>,
     states: Arc<RwLock<HashMap<String, Variable>>>,
-    name: String,
     ns_name: Option<String>,
 }
 
-impl Default for Scope {
-    fn default() -> Self {
-        Self {
-            parent: Default::default(),
-            states: Default::default(),
-            name: "<root>".to_string(),
-            ns_name: Default::default(),
-        }
-    }
-}
-
 impl Scope {
-    pub fn new(states: HashMap<String, Variable>, name: Option<String>) -> Self {
+    pub fn new(states: HashMap<String, Variable>) -> Self {
         Scope {
             parent: None,
             states: Arc::new(RwLock::new(states)),
-            name: name.unwrap_or_else(|| "<root>".to_string()),
             ns_name: None,
         }
     }
 
-    pub fn create_child_scope(
-        &self,
-        states: HashMap<String, Variable>,
-        name: Option<String>,
-    ) -> Self {
+    fn name(&self) -> &'static str {
+        if self.parent.is_none() {
+            "<root>"
+        } else {
+            "<anonymous>"
+        }
+    }
+
+    pub fn create_child_scope(&self, states: HashMap<String, Variable>) -> Self {
         Scope {
             parent: Some(self.clone().into()),
             states: Arc::new(RwLock::new(states)),
-            name: name.unwrap_or_else(|| "<anonymous>".to_string()),
             ns_name: None,
         }
     }
@@ -53,18 +43,16 @@ impl Scope {
         &self,
         ns_name: String,
         states: HashMap<String, Variable>,
-        name: Option<String>,
     ) -> Self {
         Scope {
             parent: Some(self.clone().into()),
             states: Arc::new(RwLock::new(states)),
-            name: name.unwrap_or_else(|| "<anonymous>".to_string()),
             ns_name: Some(ns_name),
         }
     }
 
     pub async fn get(&self, name: &str) -> Result<Value, AiScriptError> {
-        self.get_(name, &self.name).await
+        self.get_(name, self.name()).await
     }
 
     fn get_<'a>(
@@ -123,7 +111,7 @@ impl Scope {
             if self.states.read().await.contains_key(name) {
                 Err(AiScriptRuntimeError::Runtime(format!(
                     "Variable '{name}' already exists in scope '{}'",
-                    self.name
+                    self.name()
                 )))?
             } else {
                 self.states
@@ -142,7 +130,7 @@ impl Scope {
     }
 
     pub async fn assign(&self, name: &str, val: Value) -> Result<(), AiScriptError> {
-        self.assign_(name, val, &self.name).await
+        self.assign_(name, val, self.name()).await
     }
 
     fn assign_<'a>(
