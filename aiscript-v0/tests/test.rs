@@ -101,7 +101,7 @@ mod interpreter {
                 )
                 .await
                 .unwrap();
-            let vars = aiscript.scope.get_all();
+            let vars = aiscript.scope.get_all().await;
             assert_ne!(vars.get("a"), None);
             assert_ne!(vars.get("b"), None);
             assert_ne!(vars.get("a"), None);

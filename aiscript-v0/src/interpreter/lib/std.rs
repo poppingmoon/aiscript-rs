@@ -1,12 +1,9 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use chrono::{Datelike, TimeZone, Timelike};
 use futures::FutureExt;
 use indexmap::IndexMap;
+use tokio::sync::Mutex;
 use uri_encoding::{decode_uri, decode_uri_component, encode_uri, encode_uri_component};
 
 use crate::{
@@ -1236,8 +1233,9 @@ pub fn std() -> HashMap<String, Value> {
                 .map_or_else(Value::null, |seed| {
                     let rng = Arc::new(Mutex::new(seedrandom(seed)));
                     Value::fn_native(move |args, _| {
-                        let r = (rng.clone().lock().unwrap())();
+                        let rng = rng.clone();
                         async move {
+                            let r = (rng.lock().await)();
                             let mut args = args.into_iter();
                             let min = args.next().and_then(|arg| f64::try_from(arg).ok());
                             let max = args.next().and_then(|arg| f64::try_from(arg).ok());
@@ -1607,20 +1605,22 @@ pub fn std() -> HashMap<String, Value> {
                     .next()
                     .map(bool::try_from)
                     .map_or(Ok(None), |r| r.map(Some))?;
-                let abort_handler = interpreter.register_abort_handler({
-                    let interpreter = interpreter.clone();
-                    async move {
-                        let mut interval =
-                            tokio::time::interval(Duration::from_millis(interval as u64));
-                        if !immediate.unwrap_or(false) {
-                            interval.tick().await;
+                let abort_handler = interpreter
+                    .register_abort_handler({
+                        let interpreter = interpreter.clone();
+                        async move {
+                            let mut interval =
+                                tokio::time::interval(Duration::from_millis(interval as u64));
+                            if !immediate.unwrap_or(false) {
+                                interval.tick().await;
+                            }
+                            loop {
+                                interval.tick().await;
+                                interpreter.exec_fn(callback.clone(), Vec::new()).await?;
+                            }
                         }
-                        loop {
-                            interval.tick().await;
-                            interpreter.exec_fn(callback.clone(), Vec::new()).await?;
-                        }
-                    }
-                });
+                    })
+                    .await;
                 Ok(Value::fn_native(move |_, _| {
                     abort_handler.abort();
                     async move { Ok(Value::null()) }.boxed()
@@ -1638,14 +1638,16 @@ pub fn std() -> HashMap<String, Value> {
                 let mut args = args.into_iter();
                 let interval = f64::try_from(args.next().unwrap_or_default())?;
                 let callback = VFn::try_from(args.next().unwrap_or_default())?;
-                let abort_handler = interpreter.register_abort_handler({
-                    let interpreter = interpreter.clone();
-                    async move {
-                        tokio::time::sleep(Duration::from_millis(interval as u64)).await;
-                        interpreter.exec_fn(callback.clone(), Vec::new()).await?;
-                        Ok(())
-                    }
-                });
+                let abort_handler = interpreter
+                    .register_abort_handler({
+                        let interpreter = interpreter.clone();
+                        async move {
+                            tokio::time::sleep(Duration::from_millis(interval as u64)).await;
+                            interpreter.exec_fn(callback.clone(), Vec::new()).await?;
+                            Ok(())
+                        }
+                    })
+                    .await;
                 Ok(Value::fn_native(move |_, _| {
                     abort_handler.abort();
                     async move { Ok(Value::null()) }.boxed()

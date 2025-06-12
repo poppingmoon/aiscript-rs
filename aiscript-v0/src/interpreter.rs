@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     iter::{repeat, zip},
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
@@ -15,6 +15,7 @@ use futures::{
     future::{BoxFuture, try_join_all},
 };
 use indexmap::IndexMap;
+use tokio::sync::Mutex;
 use value::VObj;
 
 use crate::{
@@ -206,7 +207,7 @@ impl Interpreter {
             Err(e) => {
                 if let Some(err) = &self.err {
                     if !self.stop.load(Ordering::SeqCst) {
-                        self.abort();
+                        self.abort().await;
                         err(e).await;
                         return Ok(None);
                     }
@@ -268,7 +269,7 @@ impl Interpreter {
                         let variable = Variable::Const(
                             self.eval_expression(&definition.expr, &ns_scope).await?,
                         );
-                        ns_scope.add(&definition.name, variable)?;
+                        ns_scope.add(&definition.name, variable).await?;
                     }
                 }
             }
@@ -344,14 +345,16 @@ impl Interpreter {
                             }
                             None => None,
                         };
-                        scope.add(
-                            &definition.name,
-                            if definition.mut_ {
-                                Variable::Mut(Value { attr, ..value })
-                            } else {
-                                Variable::Const(Value { attr, ..value })
-                            },
-                        )?;
+                        scope
+                            .add(
+                                &definition.name,
+                                if definition.mut_ {
+                                    Variable::Mut(Value { attr, ..value })
+                                } else {
+                                    Variable::Const(Value { attr, ..value })
+                                },
+                            )
+                            .await?;
                         Value::null()
                     }
                     ast::Statement::Return(return_) => {
@@ -533,7 +536,7 @@ impl Interpreter {
                     .await?
                 }
                 ast::Expression::Exists(exists) => {
-                    Value::bool(scope.exists(&exists.identifier.name))
+                    Value::bool(scope.exists(&exists.identifier.name).await)
                 }
                 ast::Expression::Tmpl(tmpl) => {
                     let mut str = String::new();
@@ -618,7 +621,7 @@ impl Interpreter {
                         }
                     }
                 }
-                ast::Expression::Identifier(identifier) => scope.get(&identifier.name)?,
+                ast::Expression::Identifier(identifier) => scope.get(&identifier.name).await?,
                 ast::Expression::Call(call) => {
                     let callee = self.eval_expression(&call.target, scope).await?;
                     let callee = VFn::try_from(callee)?;
@@ -697,16 +700,16 @@ impl Interpreter {
         Ok(v)
     }
 
-    pub fn register_abort_handler(
+    pub async fn register_abort_handler(
         &self,
         task: impl Future<Output = Result<(), AiScriptError>> + Send + 'static,
     ) -> tokio::task::AbortHandle {
-        self.abort_handlers.lock().unwrap().spawn(task)
+        self.abort_handlers.lock().await.spawn(task)
     }
 
-    pub fn abort(&self) {
+    pub async fn abort(&self) {
         self.stop.store(true, Ordering::SeqCst);
-        self.abort_handlers.lock().unwrap().abort_all();
+        self.abort_handlers.lock().await.abort_all();
     }
 
     fn assign<'a>(
@@ -717,7 +720,9 @@ impl Interpreter {
     ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
             match dest {
-                ast::Expression::Identifier(identifier) => scope.assign(&identifier.name, value)?,
+                ast::Expression::Identifier(identifier) => {
+                    scope.assign(&identifier.name, value).await?
+                }
                 ast::Expression::Index(index) => {
                     let assignee = self.eval_expression(&index.target, scope).await?;
                     let i = self.eval_expression(&index.index, scope).await?;
