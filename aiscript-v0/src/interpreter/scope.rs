@@ -9,7 +9,7 @@ use super::{value::Value, variable::Variable};
 
 #[derive(Clone, Debug, Default)]
 pub struct Scope {
-    parent: Option<Box<Scope>>,
+    pub parent: Option<Box<Scope>>,
     states: Arc<RwLock<HashMap<String, Variable>>>,
     ns_name: Option<String>,
 }
@@ -89,7 +89,7 @@ impl Scope {
         .boxed()
     }
 
-    pub fn get_all(&self) -> BoxFuture<HashMap<String, Variable>> {
+    pub fn get_all(&self) -> BoxFuture<'_, HashMap<String, Variable>> {
         async move {
             if let Some(parent) = &self.parent {
                 let mut states = parent.get_all().await;

@@ -1619,6 +1619,7 @@ pub fn std() -> HashMap<String, Value> {
                                 interpreter.exec_fn(callback.clone(), Vec::new()).await?;
                             }
                         }
+                        .boxed()
                     })
                     .await;
                 Ok(Value::fn_native(move |_, _| {
@@ -1646,6 +1647,7 @@ pub fn std() -> HashMap<String, Value> {
                             interpreter.exec_fn(callback.clone(), Vec::new()).await?;
                             Ok(())
                         }
+                        .boxed()
                     })
                     .await;
                 Ok(Value::fn_native(move |_, _| {
