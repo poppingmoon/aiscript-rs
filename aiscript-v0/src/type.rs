@@ -55,7 +55,7 @@ impl TryFrom<ast::TypeSource> for Type {
                     }
                     Ok(Type::Generic)
                 }
-                _ => Err(AiScriptSyntaxError::UnknownType(type_source.to_string())),
+                _ => Err(AiScriptSyntaxError::unknown_type(type_source)),
             },
             ast::TypeSource::FnTypeSource(ast::FnTypeSource { args, result, .. }) => {
                 for arg in args {

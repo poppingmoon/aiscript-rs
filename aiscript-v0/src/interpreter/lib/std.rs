@@ -1,20 +1,25 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use chrono::{Datelike, TimeZone, Timelike};
 use futures::FutureExt;
 use indexmap::IndexMap;
-use tokio::sync::Mutex;
-use uri_encoding::{decode_uri, decode_uri_component, encode_uri, encode_uri_component};
 
 use crate::{
     constants::AISCRIPT_VERSION,
     error::{AiScriptError, AiScriptRuntimeError},
     interpreter::{
-        lib::std::seedrandom::seedrandom,
         util::expect_any,
-        value::{V, Value},
+        value::{V, VFn, VObj, Value},
     },
-    values::{VFn, VObj},
+};
+
+use self::{
+    seedrandom::seedrandom,
+    uri_encoding::{decode_uri, decode_uri_component, encode_uri, encode_uri_component},
 };
 
 mod seedrandom;
@@ -35,248 +40,220 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Core:not".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = bool::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::bool(!a))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = bool::try_from(args.next().unwrap_or_default()).map(|a| Value::bool(!a));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:eq".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = expect_any(args.next())?;
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).and_then(|a| {
                 let b = expect_any(args.next())?;
                 Ok(Value::bool(a == b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:neq".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = expect_any(args.next())?;
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).and_then(|a| {
                 let b = expect_any(args.next())?;
                 Ok(Value::bool(a != b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:and".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = bool::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = bool::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 Ok(Value::bool(if !a {
                     false
                 } else {
                     bool::try_from(args.next().unwrap_or_default())?
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:or".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = bool::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = bool::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 Ok(Value::bool(if a {
                     true
                 } else {
                     bool::try_from(args.next().unwrap_or_default())?
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:add".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a + b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:sub".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a - b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:mul".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a * b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:pow".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 let res = a.powf(b);
                 if res.is_nan() {
                     // ex. √-1)
-                    Err(AiScriptRuntimeError::Runtime(
-                        "Invalid operation.".to_string(),
-                    ))?
+                    Err(AiScriptRuntimeError::runtime("Invalid operation."))?
                 } else {
                     Ok(Value::num(res))
                 }
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:div".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 let res = a / b;
                 if res.is_nan() {
-                    Err(AiScriptRuntimeError::Runtime(
-                        "Invalid operation.".to_string(),
-                    ))?
+                    Err(AiScriptRuntimeError::runtime("Invalid operation."))?
                 } else {
                     Ok(Value::num(res))
                 }
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:mod".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a % b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:gt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::bool(a > b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:lt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::bool(a < b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:gteq".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::bool(a >= b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:lteq".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::bool(a <= b))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:type".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = expect_any(args.next())?;
-                Ok(Value::str(v.display_type().to_string()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).map(|v| Value::str(v.display_type().to_string()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:to_str".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = expect_any(args.next())?;
-                Ok(Value::str(v.repr_value().to_string()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).map(|v| Value::str(v.repr_value().to_string()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:range".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::arr(if a < b {
                     let length = (b - a).floor() + 1.0;
@@ -299,18 +276,19 @@ pub fn std() -> HashMap<String, Value> {
                 } else {
                     vec![Value::num(a)]
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Core:sleep".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let delay = f64::try_from(args.next().unwrap_or_default())?;
-                tokio::time::sleep(Duration::from_millis(delay as u64)).await;
+            let mut args = args.into_iter();
+            let sleep = f64::try_from(args.next().unwrap_or_default())
+                .map(|delay| tokio::time::sleep(Duration::from_millis(delay as u64)));
+            async {
+                sleep?.await;
                 Ok(Value::null())
             }
             .boxed()
@@ -320,233 +298,235 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Core:abort".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let message = String::try_from(args.next().unwrap_or_default())?;
-                Err(AiScriptRuntimeError::User(message))?
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .and_then(|message| Err(AiScriptRuntimeError::user(message))?);
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Util:uuid".to_string(),
-        Value::fn_native(|_, _| async move { Ok(Value::str(uuid::Uuid::new_v4())) }.boxed()),
+        Value::fn_native(|_, _| {
+            let result = Ok(Value::str(uuid::Uuid::new_v4()));
+            async { result }.boxed()
+        }),
     );
 
     std.insert(
         "Json:stringify".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = expect_any(args.next())?;
-                serde_json::to_string(&v.value).map_or_else(
-                    |err| {
-                        if err.to_string() == "cyclic_reference" {
-                            Err(AiScriptError::Internal("too much recursion".to_string()))
-                        } else {
-                            Ok(Value::error("not_json", None))
-                        }
-                    },
-                    |value| Ok(Value::str(value)),
-                )
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).and_then(|v| {
+                Ok(Value::str(
+                    serde_json::to_string(&v.value).map_err(AiScriptError::internal)?,
+                ))
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Json:parse".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let json = String::try_from(args.next().unwrap_or_default())?;
-                Ok(serde_json::from_str(&json)
-                    .map_or_else(|_| Value::error("not_json", None), Value::new))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).map(|json| {
+                serde_json::from_str(&json)
+                    .map_or_else(|_| Value::error("not_json", None), Value::new)
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Json:parsable".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let json = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::bool(serde_json::from_str::<V>(&json).is_ok()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .map(|json| Value::bool(serde_json::from_str::<V>(&json).is_ok()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:now".to_string(),
         Value::fn_native(|_, _| {
-            async move { Ok(Value::num(chrono::Local::now().timestamp_millis() as f64)) }.boxed()
+            let result = Ok(Value::num(chrono::Local::now().timestamp_millis() as f64));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:year".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.year()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.year()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:month".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.month()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.month()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:day".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.day()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.day()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:hour".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.hour()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.hour()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:minute".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.minute()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.minute()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:second".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let date =
-                    args.next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || Ok(chrono::Local::now()),
-                            |v| {
-                                chrono::Local.timestamp_millis_opt(v as i64).single().ok_or(
-                                    AiScriptError::Internal(format!("invalid timestamp: {v}")),
-                                )
-                            },
-                        )?;
-                Ok(Value::num(date.second()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
+                    } else {
+                        chrono::Local::now()
+                    };
+                    Ok(Value::num(date.second()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:millisecond".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = args
-                    .next()
-                    .map(f64::try_from)
-                    .map_or(Ok(None), |r| r.map(Some))?
-                    .unwrap_or_else(|| chrono::Local::now().timestamp_millis() as f64);
-                Ok(Value::num(v % 1000.0))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .map(|v| {
+                    let v = v.unwrap_or_else(|| chrono::Local::now().timestamp_millis() as f64);
+                    Value::num(v % 1000.0)
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:parse".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).map(|v| {
                 let v = v.trim();
                 let date = v
                     .parse::<chrono::DateTime<chrono::FixedOffset>>()
@@ -680,56 +660,50 @@ pub fn std() -> HashMap<String, Value> {
                         Some(time.timestamp_millis())
                     })
                     .map_or(f64::NAN, |date| date as f64);
-                Ok(Value::num(date))
-            }
-            .boxed()
+                Value::num(date)
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Date:to_iso_str".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let mut date = args
-                    .next()
-                    .map(f64::try_from)
-                    .map_or(Ok(None), |r| r.map(Some))?
-                    .map_or_else(chrono::Local::now, |v| {
-                        chrono::Local.timestamp_millis_opt(v as i64).unwrap()
-                    });
-                let local_offset =
-                    chrono::Duration::seconds(date.offset().local_minus_utc() as i64);
-                let ofs = args
-                    .next()
-                    .map(f64::try_from)
-                    .map_or(Ok(None), |r| r.map(Some))?
-                    .map(|ofs| chrono::Duration::minutes(ofs as i64));
-                if let Some(ofs) = ofs {
-                    date += -local_offset + ofs;
-                }
-                let ofs = ofs.unwrap_or(local_offset);
-                Ok(Value::str(format!(
-                    "{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}.{ms:03}{offset_s}",
-                    y = date.year(),
-                    mo = date.month(),
-                    d = date.day(),
-                    h = date.hour(),
-                    mi = date.minute(),
-                    s = date.second(),
-                    ms = date.timestamp_millis() % 1000,
-                    offset_s = if ofs.is_zero() {
-                        "Z".to_string()
+            let mut args = args.into_iter();
+            let result = args
+                .next()
+                .map(f64::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+                .and_then(|v| {
+                    let date = if let Some(v) = v {
+                        chrono::Local
+                            .timestamp_millis_opt(v as i64)
+                            .earliest()
+                            .ok_or_else(|| {
+                                AiScriptError::internal(format!("invalid timestamp: {v}"))
+                            })?
                     } else {
-                        format!(
-                            "{hours:+03}:{minutes:02}",
-                            hours = ofs.num_hours(),
-                            minutes = ofs.num_minutes().abs() % 60,
-                        )
-                    },
-                )))
-            }
-            .boxed()
+                        chrono::Local::now()
+                    };
+                    let mut date = date.fixed_offset();
+                    let offset = args
+                        .next()
+                        .map(f64::try_from)
+                        .map_or(Ok(None), |r| r.map(Some))?
+                        .and_then(|ofs| chrono::FixedOffset::east_opt((ofs * 60.0) as i32));
+                    if let Some(offset) = offset {
+                        date = date.with_timezone(&offset);
+                    }
+                    Ok(Value::str(format!(
+                        "{}",
+                        date.format(if date.offset().local_minus_utc() == 0 {
+                            "%Y-%m-%dT%H:%M:%S%.3fZ"
+                        } else {
+                            "%Y-%m-%dT%H:%M:%S%.3f%:z"
+                        }),
+                    )))
+                });
+            async { result }.boxed()
         }),
     );
 
@@ -766,216 +740,181 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Math:abs".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.abs()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.abs()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:acos".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.acos()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.acos()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:acosh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.acosh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.acosh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:asin".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.asin()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.asin()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:asinh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.asinh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.asinh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:atan".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.atan()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.atan()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:atanh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.atanh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.atanh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:atan2".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let y = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|y| {
                 let x = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(y.atan2(x)))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:cbrt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.cbrt()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.cbrt()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:ceil".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.ceil()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.ceil()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:clz32".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num((v as i32).leading_zeros()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default())
+                .map(|v| Value::num((v as i32).leading_zeros()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:cos".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.cos()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.cos()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:cosh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.cosh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.cosh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:exp".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.exp()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.exp()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:expm1".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.exp_m1()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.exp_m1()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:floor".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.floor()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.floor()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:fround".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v as f32))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v as f32));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:hypot".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let args = <Vec<Value>>::try_from(args.next().unwrap_or_default())?;
-                let len = args.len();
-                Ok(Value::num(match len {
+            let mut args = args.into_iter();
+            let result = <Vec<Value>>::try_from(args.next().unwrap_or_default()).and_then(|args| {
+                Ok(Value::num(match args.len() {
                     0 => 0.0,
                     1 => f64::try_from(args.into_iter().next().unwrap_or_default())?.abs(),
                     2 => {
@@ -993,239 +932,208 @@ pub fn std() -> HashMap<String, Value> {
                         values.iter().fold(0.0, |acc, v| acc + v * v).sqrt()
                     }
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:imul".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num((a as i32) * (b as i32)))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:log".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.ln()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.ln()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:log1p".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.ln_1p()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.ln_1p()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:log10".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.log10()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.log10()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:log2".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.log2()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.log2()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:max".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a.max(b)))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:min".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a.min(b)))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:pow".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(a.powf(b)))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:round".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.round()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.round()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:sign".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(if v < 0.0 {
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).map(|v| {
+                Value::num(if v < 0.0 {
                     -1.0
                 } else if v == 0.0 {
                     0.0
                 } else {
                     1.0
-                }))
-            }
-            .boxed()
+                })
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:sin".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.sin()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.sin()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:sinh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.sinh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.sinh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:sqrt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.sqrt()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.sqrt()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:tan".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.tan()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.tan()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:tanh".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.tanh()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.tanh()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:trunc".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(v.trunc()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                f64::try_from(args.next().unwrap_or_default()).map(|v| Value::num(v.trunc()));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:rnd".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let min = args.next().and_then(|arg| f64::try_from(arg).ok());
-                let max = args.next().and_then(|arg| f64::try_from(arg).ok());
-                Ok(Value::num(if let (Some(min), Some(max)) = (min, max) {
-                    let max = max.floor();
-                    let min = min.ceil();
-                    (rand::random::<f64>() * (max - min + 1.0)).floor() + min
-                } else {
-                    rand::random()
-                }))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let min = args.next().and_then(|arg| f64::try_from(arg).ok());
+            let max = args.next().and_then(|arg| f64::try_from(arg).ok());
+            let result = Ok(Value::num(if let (Some(min), Some(max)) = (min, max) {
+                let max = max.floor();
+                let min = min.ceil();
+                (rand::random::<f64>() * (max - min + 1.0)).floor() + min
+            } else {
+                rand::random()
+            }));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Math:gen_rng".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let seed = expect_any(args.next())?;
-                Ok(match *seed.value {
+            let mut args = args.into_iter();
+            let result = expect_any(args.next()).map(|seed| {
+                match *seed.value {
                     V::Num(num) => Some(num.to_string()),
                     V::Str(str) => Some(str),
                     _ => None,
@@ -1233,51 +1141,48 @@ pub fn std() -> HashMap<String, Value> {
                 .map_or_else(Value::null, |seed| {
                     let rng = Arc::new(Mutex::new(seedrandom(seed)));
                     Value::fn_native(move |args, _| {
-                        let rng = rng.clone();
-                        async move {
-                            let r = (rng.lock().await)();
-                            let mut args = args.into_iter();
-                            let min = args.next().and_then(|arg| f64::try_from(arg).ok());
-                            let max = args.next().and_then(|arg| f64::try_from(arg).ok());
-                            Ok(Value::num(if let (Some(min), Some(max)) = (min, max) {
-                                let max = max.floor();
-                                let min = min.ceil();
-                                (r * (max - min + 1.0)).floor() + min
-                            } else {
-                                r
-                            }))
-                        }
-                        .boxed()
+                        let result = rng
+                            .lock()
+                            .map_err(AiScriptError::internal)
+                            .map(|mut rng| rng())
+                            .map(|r| {
+                                let mut args = args.into_iter();
+                                let min = args.next().and_then(|arg| f64::try_from(arg).ok());
+                                let max = args.next().and_then(|arg| f64::try_from(arg).ok());
+                                Value::num(if let (Some(min), Some(max)) = (min, max) {
+                                    let max = max.floor();
+                                    let min = min.ceil();
+                                    (r * (max - min + 1.0)).floor() + min
+                                } else {
+                                    r
+                                })
+                            });
+
+                        async { result }.boxed()
                     })
-                }))
-            }
-            .boxed()
+                })
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Num:to_hex".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::str(format!("{:x}", v as i64)))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default())
+                .map(|v| Value::str(format!("{:x}", v as i64)));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Num:from_hex".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(
-                    i64::from_str_radix(&v, 16).map_or(f64::NAN, |v| v as f64),
-                ))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .map(|v| Value::num(i64::from_str_radix(&v, 16).map_or(f64::NAN, |v| v as f64)));
+            async { result }.boxed()
         }),
     );
 
@@ -1286,337 +1191,329 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Str:lt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = String::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = String::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(match a.cmp(&b) {
                     std::cmp::Ordering::Less => -1.0,
                     std::cmp::Ordering::Equal => 0.0,
                     std::cmp::Ordering::Greater => 1.0,
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Str:gt".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let a = String::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = String::try_from(args.next().unwrap_or_default())?;
                 Ok(Value::num(match a.cmp(&b) {
                     std::cmp::Ordering::Less => 1.0,
                     std::cmp::Ordering::Equal => 0.0,
                     std::cmp::Ordering::Greater => -1.0,
                 }))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Str:from_codepoint".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let codepoint = f64::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|codepoint| {
                 char::from_u32(codepoint as u32).map_or_else(
                     || {
-                        Err(AiScriptError::Internal(format!(
+                        Err(AiScriptError::internal(format!(
                             "{codepoint} is not a valid code point"
                         )))
                     },
                     |c| Ok(Value::str(c)),
                 )
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Str:from_unicode_codepoints".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let codepoints = <Vec<Value>>::try_from(args.next().unwrap_or_default())?;
-                let mut s = String::new();
-                for codepoint in codepoints {
-                    let codepoint = f64::try_from(codepoint)?;
-                    s += char::from_u32(codepoint as u32)
-                        .map_or_else(
-                            || {
-                                Err(AiScriptError::Internal(format!(
-                                    "{codepoint} is not a valid code point"
-                                )))
-                            },
-                            |c| Ok(c.to_string()),
-                        )?
-                        .as_str();
-                }
-                Ok(Value::str(s))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                <Vec<Value>>::try_from(args.next().unwrap_or_default()).and_then(|codepoints| {
+                    let mut s = String::new();
+                    for codepoint in codepoints {
+                        let codepoint = f64::try_from(codepoint)?;
+                        let c = char::from_u32(codepoint as u32).ok_or_else(|| {
+                            AiScriptError::internal(format!(
+                                "{codepoint} is not a valid code point"
+                            ))
+                        })?;
+                        s += c.to_string().as_str();
+                    }
+                    Ok(Value::str(s))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Str:from_utf8_bytes".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let bytes = <Vec<Value>>::try_from(args.next().unwrap_or_default())?;
-                let bytes = bytes
-                    .into_iter()
-                    .map(|a| f64::try_from(a).map(|a| a as u8))
-                    .collect::<Result<Vec<u8>, AiScriptError>>()?;
-                Ok(Value::str(String::from_utf8(bytes).unwrap_or_default()))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result =
+                <Vec<Value>>::try_from(args.next().unwrap_or_default()).and_then(|bytes| {
+                    let bytes = bytes
+                        .into_iter()
+                        .map(|a| f64::try_from(a).map(|a| a.trunc().rem_euclid(256.0) as u8))
+                        .collect::<Result<Vec<u8>, AiScriptError>>()?;
+                    Ok(Value::str(String::from_utf8(bytes).unwrap_or_default()))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Uri:encode_full".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::str(encode_uri(&v)))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .map(|v| Value::str(encode_uri(&v)));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Uri:encode_component".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::str(encode_uri_component(&v)))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .map(|v| Value::str(encode_uri_component(&v)));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Uri:decode_full".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::str(
-                    decode_uri(&v).map_err(|e| AiScriptError::Internal(e.to_string()))?,
-                ))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default())
+                .and_then(|v| Ok(Value::str(decode_uri(&v).map_err(AiScriptError::internal)?)));
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Uri:decode_component".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let v = String::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).and_then(|v| {
                 Ok(Value::str(
-                    decode_uri_component(&v).map_err(|e| AiScriptError::Internal(e.to_string()))?,
+                    decode_uri_component(&v).map_err(AiScriptError::internal)?,
                 ))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Arr:create".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let length = f64::try_from(args.next().unwrap_or_default())?;
-                let initial = args.next().unwrap_or_default();
+            let mut args = args.into_iter();
+            let result = f64::try_from(args.next().unwrap_or_default()).and_then(|length| {
                 if length < 0.0 {
-                    Err(AiScriptRuntimeError::Runtime(
-                        "arr.repeat expected non-negative number, got negative".to_string(),
+                    Err(AiScriptRuntimeError::runtime(
+                        "arr.repeat expected non-negative number, got negative",
                     ))?
                 } else if length.trunc() != length {
-                    Err(AiScriptRuntimeError::Runtime(
-                        "arr.repeat expected integer, got non-integer".to_string(),
+                    Err(AiScriptRuntimeError::runtime(
+                        "arr.repeat expected integer, got non-integer",
                     ))?
                 } else {
-                    let mut value = Vec::new();
-                    for _ in 0..length as usize {
-                        value.push(initial.clone())
-                    }
-                    Ok(Value::arr(value))
+                    let initial = args.next().unwrap_or_default();
+                    Ok(Value::arr(std::iter::repeat_n(initial, length as usize)))
                 }
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:keys".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
-                let keys = obj
-                    .read()
-                    .unwrap()
-                    .keys()
-                    .map(Value::str)
-                    .collect::<Vec<Value>>();
-                Ok(Value::arr(keys))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
+                Ok(Value::arr(
+                    obj.read()
+                        .map_err(AiScriptError::internal)?
+                        .keys()
+                        .map(Value::str),
+                ))
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:vals".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
-                let vals = obj
-                    .read()
-                    .unwrap()
-                    .values()
-                    .cloned()
-                    .collect::<Vec<Value>>();
-                Ok(Value::arr(vals))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
+                Ok(Value::arr(
+                    obj.read()
+                        .map_err(AiScriptError::internal)?
+                        .values()
+                        .cloned(),
+                ))
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:kvs".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
-                let kvs = obj
-                    .read()
-                    .unwrap()
-                    .iter()
-                    .map(|(k, v)| Value::arr([Value::str(k), v.clone()]))
-                    .collect::<Vec<Value>>();
-                Ok(Value::arr(kvs))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
+                Ok(Value::arr(
+                    obj.read()
+                        .map_err(AiScriptError::internal)?
+                        .iter()
+                        .map(|(k, v)| Value::arr([Value::str(k), v.clone()])),
+                ))
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:get".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
                 let key = String::try_from(args.next().unwrap_or_default())?;
-                let value = obj.read().unwrap().get(&key).cloned().unwrap_or_default();
+                let value = obj
+                    .read()
+                    .map_err(AiScriptError::internal)?
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or_default();
                 Ok(value)
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:set".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
                 let key = String::try_from(args.next().unwrap_or_default())?;
                 let value = expect_any(args.next())?;
-                obj.write().unwrap().insert(key, value);
+                obj.write()
+                    .map_err(AiScriptError::internal)?
+                    .insert(key, value);
                 Ok(Value::null())
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:has".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = VObj::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = VObj::try_from(args.next().unwrap_or_default()).and_then(|obj| {
                 let key = String::try_from(args.next().unwrap_or_default())?;
-                let has = obj.read().unwrap().contains_key(&key);
+                let has = obj
+                    .read()
+                    .map_err(AiScriptError::internal)?
+                    .contains_key(&key);
                 Ok(Value::bool(has))
-            }
-            .boxed()
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:copy".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let obj = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::obj(obj))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())
+                .map(Value::obj);
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Obj:merge".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let mut a = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())?;
-                let b = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())?;
-                a.extend(b);
-                Ok(Value::obj(a))
-            }
-            .boxed()
+            let mut args = args.into_iter();
+            let result = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())
+                .and_then(|mut a| {
+                    let b = <IndexMap<String, Value>>::try_from(args.next().unwrap_or_default())?;
+                    a.extend(b);
+                    Ok(Value::obj(a))
+                });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Error:create".to_string(),
         Value::fn_native(|args, _| {
-            async move {
-                let mut args = args.into_iter();
-                let name = String::try_from(args.next().unwrap_or_default())?;
+            let mut args = args.into_iter();
+            let result = String::try_from(args.next().unwrap_or_default()).map(|name| {
                 let info = args.next();
-                Ok(Value::error(name, info))
-            }
-            .boxed()
+                Value::error(name, info)
+            });
+            async { result }.boxed()
         }),
     );
 
     std.insert(
         "Async:interval".to_string(),
         Value::fn_native(|args, interpreter| {
+            let mut args = args.into_iter();
+            let interval = match f64::try_from(args.next().unwrap_or_default()) {
+                Ok(interval) => Duration::from_millis(interval as u64),
+                Err(e) => return async { Err(e) }.boxed(),
+            };
+            let callback = match VFn::try_from(args.next().unwrap_or_default()) {
+                Ok(callback) => callback,
+                Err(e) => return async { Err(e) }.boxed(),
+            };
+            let immediate = match args
+                .next()
+                .map(bool::try_from)
+                .map_or(Ok(None), |r| r.map(Some))
+            {
+                Ok(immediate) => immediate.unwrap_or(false),
+                Err(e) => return async { Err(e) }.boxed(),
+            };
             let interpreter = interpreter.clone();
             async move {
-                let mut args = args.into_iter();
-                let interval = f64::try_from(args.next().unwrap_or_default())?;
-                let callback = VFn::try_from(args.next().unwrap_or_default())?;
-                let immediate = args
-                    .next()
-                    .map(bool::try_from)
-                    .map_or(Ok(None), |r| r.map(Some))?;
                 let abort_handler = interpreter
                     .register_abort_handler({
                         let interpreter = interpreter.clone();
                         async move {
-                            let mut interval =
-                                tokio::time::interval(Duration::from_millis(interval as u64));
-                            if !immediate.unwrap_or(false) {
+                            let mut interval = tokio::time::interval(interval);
+                            if !immediate {
                                 interval.tick().await;
                             }
                             loop {
                                 interval.tick().await;
-                                interpreter.exec_fn(callback.clone(), Vec::new()).await?;
+                                let interpreter = interpreter.clone();
+                                let callback = callback.clone();
+                                tokio::spawn(
+                                    async move { interpreter.exec_fn(callback, []).await },
+                                )
+                                .await
+                                .map_err(AiScriptError::internal)??;
                             }
                         }
                         .boxed()
@@ -1624,7 +1521,7 @@ pub fn std() -> HashMap<String, Value> {
                     .await;
                 Ok(Value::fn_native(move |_, _| {
                     abort_handler.abort();
-                    async move { Ok(Value::null()) }.boxed()
+                    async { Ok(Value::null()) }.boxed()
                 }))
             }
             .boxed()
@@ -1634,17 +1531,26 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Async:timeout".to_string(),
         Value::fn_native(|args, interpreter| {
+            let mut args = args.into_iter();
+            let delay = match f64::try_from(args.next().unwrap_or_default()) {
+                Ok(delay) => Duration::from_millis(delay as u64),
+                Err(e) => return async { Err(e) }.boxed(),
+            };
+            let callback = match VFn::try_from(args.next().unwrap_or_default()) {
+                Ok(callback) => callback,
+                Err(e) => return async { Err(e) }.boxed(),
+            };
             let interpreter = interpreter.clone();
             async move {
-                let mut args = args.into_iter();
-                let interval = f64::try_from(args.next().unwrap_or_default())?;
-                let callback = VFn::try_from(args.next().unwrap_or_default())?;
                 let abort_handler = interpreter
                     .register_abort_handler({
                         let interpreter = interpreter.clone();
+                        let callback = callback.clone();
                         async move {
-                            tokio::time::sleep(Duration::from_millis(interval as u64)).await;
-                            interpreter.exec_fn(callback.clone(), Vec::new()).await?;
+                            tokio::time::sleep(delay).await;
+                            tokio::spawn(async move { interpreter.exec_fn(callback, []).await })
+                                .await
+                                .map_err(AiScriptError::internal)??;
                             Ok(())
                         }
                         .boxed()
@@ -1652,7 +1558,7 @@ pub fn std() -> HashMap<String, Value> {
                     .await;
                 Ok(Value::fn_native(move |_, _| {
                     abort_handler.abort();
-                    async move { Ok(Value::null()) }.boxed()
+                    async { Ok(Value::null()) }.boxed()
                 }))
             }
             .boxed()

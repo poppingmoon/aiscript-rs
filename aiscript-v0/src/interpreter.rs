@@ -27,6 +27,7 @@ use self::{
     lib::std::std,
     primitive_props::get_prim_prop,
     scope::Scope,
+    stack::{StackExt, ValueStackExt},
     util::expect_any,
     value::{V, VFn, Value, unwrap_ret},
     variable::Variable,
@@ -36,6 +37,7 @@ mod frame;
 mod lib;
 mod primitive_props;
 pub mod scope;
+mod stack;
 pub mod util;
 pub mod value;
 mod variable;
@@ -73,12 +75,12 @@ impl Interpreter {
             (
                 "print".to_string(),
                 Value::fn_native(move |args, _| {
-                    let out = out.clone();
-                    async move {
-                        let mut args = args.into_iter();
-                        let v = expect_any(args.next())?;
-                        if let Some(out) = out {
-                            out(v).await;
+                    let mut args = args.into_iter();
+                    let out =
+                        expect_any(args.next()).map(|v| out.as_ref().map(|out| out.clone()(v)));
+                    async {
+                        if let Some(out) = out? {
+                            out.await;
                         }
                         Ok(Value::null())
                     }
@@ -88,16 +90,16 @@ impl Interpreter {
             (
                 "readline".to_string(),
                 Value::fn_native(move |args, _| {
-                    let in_ = in_.clone();
-                    async move {
-                        let mut args = args.into_iter();
-                        let q = String::try_from(args.next().unwrap_or_default())?;
-                        if let Some(in_) = in_ {
-                            let a = in_(q).await;
-                            Ok(Value::str(a))
+                    let mut args = args.into_iter();
+                    let in_ = String::try_from(args.next().unwrap_or_default())
+                        .map(|q| in_.as_ref().map(|in_| in_.clone()(q)));
+                    async {
+                        Ok(if let Some(in_) = in_? {
+                            let a = in_.await;
+                            Value::str(a)
                         } else {
-                            Ok(Value::null())
-                        }
+                            Value::null()
+                        })
                     }
                     .boxed()
                 }),
@@ -203,12 +205,12 @@ impl Interpreter {
         match result {
             Ok(value) => Ok(Some(value)),
             Err(e) => {
-                if let Some(err) = &self.err {
-                    if !self.stop.load(Ordering::SeqCst) {
-                        self.abort().await;
-                        err(e).await;
-                        return Ok(None);
-                    }
+                if let Some(err) = &self.err
+                    && !self.stop.load(Ordering::SeqCst)
+                {
+                    self.abort().await;
+                    err(e).await;
+                    return Ok(None);
                 }
                 Err(e)
             }
@@ -260,9 +262,10 @@ impl Interpreter {
             for node in ns.members {
                 if let ast::DefinitionOrNamespace::Definition(definition) = node {
                     if definition.mut_ {
-                        Err(AiScriptError::Internal(
-                            "Namespaces cannot include mutable variable: {name}".to_string(),
-                        ))?;
+                        Err(AiScriptError::internal(format!(
+                            "Namespaces cannot include mutable variable: {}",
+                            definition.name,
+                        )))?;
                     } else {
                         let variable =
                             Variable::Const(self.run(vec![definition.expr], &ns_scope).await?);
@@ -310,23 +313,10 @@ impl Interpreter {
         scope: &Scope,
     ) -> Result<Value, AiScriptError> {
         let mut stack = Vec::new();
-        let mut scope = scope.clone();
         let mut value_stack = Vec::new();
+        let mut scope = scope.clone();
 
-        fn eval(node: impl Into<Frame>, stack: &mut Vec<Frame>) {
-            stack.push(node.into());
-            stack.push(Frame::Eval);
-        }
-
-        fn run(program: Vec<impl Into<Frame>>, stack: &mut Vec<Frame>) {
-            stack.push(Frame::Run);
-            for node in program.into_iter().rev() {
-                stack.push(Frame::Unwind);
-                eval(node, stack);
-            }
-        }
-
-        run(program, &mut stack);
+        stack.run(program);
 
         while let Some(frame) = stack.pop() {
             match frame {
@@ -336,23 +326,23 @@ impl Interpreter {
                             name: definition.name,
                             mut_: definition.mut_,
                         });
-                        eval(definition.expr, &mut stack);
+                        stack.eval(definition.expr);
                     }
                     ast::Statement::Return(return_) => {
                         stack.push(Frame::Return);
-                        eval(return_.expr, &mut stack);
+                        stack.eval(return_.expr);
                     }
                     ast::Statement::Each(each) => {
                         stack.push(Frame::Each1 {
                             var: each.var,
                             for_: *each.for_,
                         });
-                        eval(each.items, &mut stack);
+                        stack.eval(each.items);
                     }
                     ast::Statement::For(for_) => {
                         if let Some(times) = for_.times {
                             stack.push(Frame::For1 { for_: *for_.for_ });
-                            eval(times, &mut stack);
+                            stack.eval(times);
                         } else if let ast::For {
                             var: Some(var),
                             from: Some(from),
@@ -366,7 +356,7 @@ impl Interpreter {
                                 to,
                                 for_: *for_,
                             });
-                            eval(from, &mut stack);
+                            stack.eval(from);
                         }
                     }
                     ast::Statement::Loop(loop_) => stack.push(Frame::Loop1 {
@@ -376,21 +366,21 @@ impl Interpreter {
                     ast::Statement::Continue(_) => value_stack.push(Value::continue_()),
                     ast::Statement::Assign(assign) => {
                         stack.push(Frame::Assign1 { dest: assign.dest });
-                        eval(assign.expr, &mut stack);
+                        stack.eval(assign.expr);
                     }
                     ast::Statement::AddAssign(add_assign) => {
                         stack.push(Frame::AddAssign1 {
                             dest: add_assign.dest.clone(),
                             expr: add_assign.expr,
                         });
-                        eval(add_assign.dest, &mut stack);
+                        stack.eval(add_assign.dest);
                     }
                     ast::Statement::SubAssign(sub_assign) => {
                         stack.push(Frame::SubAssign1 {
                             dest: sub_assign.dest.clone(),
                             expr: sub_assign.expr,
                         });
-                        eval(sub_assign.dest, &mut stack);
+                        stack.eval(sub_assign.dest);
                     }
                 },
                 Frame::Expression(expression) => match expression {
@@ -402,7 +392,7 @@ impl Interpreter {
                             elseif,
                             else_: if_.else_,
                         });
-                        eval(*if_.cond, &mut stack);
+                        stack.eval(*if_.cond);
                     }
                     ast::Expression::Fn(fn_) => {
                         let scope = scope.clone();
@@ -417,12 +407,12 @@ impl Interpreter {
                             qs: match_.qs,
                             default: match_.default,
                         });
-                        eval(*match_.about, &mut stack);
+                        stack.eval(*match_.about);
                     }
                     ast::Expression::Block(block) => {
                         scope = scope.create_child_scope(HashMap::new());
                         stack.push(Frame::Block);
-                        run(block.statements, &mut stack);
+                        stack.run(block.statements);
                     }
                     ast::Expression::Exists(exists) => {
                         let exists = scope.exists(&exists.identifier.name).await;
@@ -459,15 +449,15 @@ impl Interpreter {
                     }
                     ast::Expression::Not(not) => {
                         stack.push(Frame::Not);
-                        eval(*not.expr, &mut stack);
+                        stack.eval(*not.expr);
                     }
                     ast::Expression::And(and) => {
                         stack.push(Frame::And1 { right: *and.right });
-                        eval(*and.left, &mut stack);
+                        stack.eval(*and.left);
                     }
                     ast::Expression::Or(or) => {
                         stack.push(Frame::Or1 { right: *or.right });
-                        eval(*or.left, &mut stack);
+                        stack.eval(*or.left);
                     }
                     ast::Expression::Identifier(identifier) => {
                         let value = scope.get(&identifier.name).await?;
@@ -475,20 +465,20 @@ impl Interpreter {
                     }
                     ast::Expression::Call(call) => {
                         stack.push(Frame::Call1 { args: call.args });
-                        eval(*call.target, &mut stack);
+                        stack.eval(*call.target);
                     }
                     ast::Expression::Index(index) => {
                         stack.push(Frame::Index);
-                        eval(*index.index, &mut stack);
-                        eval(*index.target, &mut stack);
+                        stack.eval(*index.index);
+                        stack.eval(*index.target);
                     }
                     ast::Expression::Prop(prop) => {
                         stack.push(Frame::Prop { name: prop.name });
-                        eval(*prop.target, &mut stack);
+                        stack.eval(*prop.target);
                     }
                 },
                 Frame::Definition { name, mut_ } => {
-                    let value = value_stack.pop().unwrap();
+                    let value = value_stack.pop_value()?;
                     scope
                         .add(
                             &name,
@@ -502,11 +492,11 @@ impl Interpreter {
                     value_stack.push(Value::null());
                 }
                 Frame::Return => {
-                    let val = value_stack.pop().unwrap();
+                    let val = value_stack.pop_value()?;
                     value_stack.push(Value::return_(val));
                 }
                 Frame::Each1 { var, for_ } => {
-                    let items = value_stack.pop().unwrap();
+                    let items = value_stack.pop_value()?;
                     let mut items = <Vec<Value>>::try_from(items)?;
                     items.reverse();
                     stack.push(Frame::Each2 { var, items, for_ });
@@ -524,14 +514,14 @@ impl Interpreter {
                         });
                         scope = scope
                             .create_child_scope(HashMap::from_iter([(var, Variable::Const(item))]));
-                        eval(for_, &mut stack);
+                        stack.eval(for_);
                     } else {
                         value_stack.push(Value::null());
                     }
                 }
                 Frame::Each3 { var, items, for_ } => {
-                    scope = *scope.parent.unwrap();
-                    let v = value_stack.pop().unwrap();
+                    scope = scope.get_parent()?;
+                    let v = value_stack.pop_value()?;
                     match *v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
@@ -539,7 +529,7 @@ impl Interpreter {
                     }
                 }
                 Frame::For1 { for_ } => {
-                    let times = value_stack.pop().unwrap();
+                    let times = value_stack.pop_value()?;
                     let times = f64::try_from(times)?;
                     stack.push(Frame::For2 {
                         i: 0.0,
@@ -554,13 +544,13 @@ impl Interpreter {
                             times,
                             for_: for_.clone(),
                         });
-                        eval(for_, &mut stack);
+                        stack.eval(for_);
                     } else {
                         value_stack.push(Value::null());
                     }
                 }
                 Frame::For3 { i, times, for_ } => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     match *v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
@@ -572,13 +562,13 @@ impl Interpreter {
                     }
                 }
                 Frame::ForLet1 { var, to, for_ } => {
-                    let from = value_stack.pop().unwrap();
+                    let from = value_stack.pop_value()?;
                     let from = f64::try_from(from)?;
                     stack.push(Frame::ForLet2 { var, from, for_ });
-                    eval(to, &mut stack);
+                    stack.eval(to);
                 }
                 Frame::ForLet2 { var, from, for_ } => {
-                    let to = value_stack.pop().unwrap();
+                    let to = value_stack.pop_value()?;
                     let to = f64::try_from(to)?;
                     stack.push(Frame::ForLet3 {
                         var,
@@ -604,7 +594,7 @@ impl Interpreter {
                             var,
                             Variable::Const(Value::num(i)),
                         )]));
-                        eval(for_, &mut stack);
+                        stack.eval(for_);
                     } else {
                         value_stack.push(Value::null());
                     }
@@ -615,8 +605,8 @@ impl Interpreter {
                     until,
                     for_,
                 } => {
-                    scope = *scope.parent.unwrap();
-                    let v = value_stack.pop().unwrap();
+                    scope = scope.get_parent()?;
+                    let v = value_stack.pop_value()?;
                     match *v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
@@ -633,11 +623,11 @@ impl Interpreter {
                         statements: statements.clone(),
                     });
                     scope = scope.create_child_scope(HashMap::new());
-                    run(statements, &mut stack);
+                    stack.run(statements);
                 }
                 Frame::Loop2 { statements } => {
-                    scope = *scope.parent.unwrap();
-                    let v = value_stack.pop().unwrap();
+                    scope = scope.get_parent()?;
+                    let v = value_stack.pop_value()?;
                     match *v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
@@ -645,7 +635,7 @@ impl Interpreter {
                     }
                 }
                 Frame::Assign1 { dest } => {
-                    let value = value_stack.pop().unwrap();
+                    let value = value_stack.pop_value()?;
                     stack.push(Frame::Assign2 { dest, value });
                 }
                 Frame::Assign2 { dest, value } => match dest {
@@ -655,15 +645,15 @@ impl Interpreter {
                     }
                     ast::Expression::Index(index) => {
                         stack.push(Frame::AssignIndex { value });
-                        eval(*index.index, &mut stack);
-                        eval(*index.target, &mut stack);
+                        stack.eval(*index.index);
+                        stack.eval(*index.target);
                     }
                     ast::Expression::Prop(prop) => {
                         stack.push(Frame::AssignProp {
                             name: prop.name,
                             value,
                         });
-                        eval(*prop.target, &mut stack);
+                        stack.eval(*prop.target);
                     }
                     ast::Expression::Arr(arr) => {
                         let value = <Vec<Value>>::try_from(value)?;
@@ -693,34 +683,41 @@ impl Interpreter {
                         .await?;
                         value_stack.push(Value::null());
                     }
-                    _ => Err(AiScriptRuntimeError::Runtime(
+                    _ => Err(AiScriptRuntimeError::runtime(
                         "The left-hand side of an assignment expression must be a variable or a \
-                            property/index access."
-                            .to_string(),
+                            property/index access.",
                     ))?,
                 },
                 Frame::AssignIndex { value } => {
-                    let i = value_stack.pop().unwrap();
-                    let assignee = value_stack.pop().unwrap();
+                    let i = value_stack.pop_value()?;
+                    let assignee = value_stack.pop_value()?;
                     match *assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
-                            if i.trunc() == i && arr.read().unwrap().get(i as usize).is_some() {
-                                arr.write().unwrap()[i as usize] = value;
+                            if i.trunc() == i
+                                && arr
+                                    .read()
+                                    .map_err(AiScriptError::internal)?
+                                    .get(i as usize)
+                                    .is_some()
+                            {
+                                arr.write().map_err(AiScriptError::internal)?[i as usize] = value;
                                 value_stack.push(Value::null());
                             } else {
-                                Err(AiScriptRuntimeError::IndexOutOfRange(
+                                Err(AiScriptRuntimeError::index_out_of_range(
                                     i,
-                                    arr.read().unwrap().len() as isize - 1,
+                                    arr.read().map_err(AiScriptError::internal)?.len() as isize - 1,
                                 ))?
                             }
                         }
                         V::Obj(obj) => {
                             let i = String::try_from(i)?;
-                            obj.write().unwrap().insert(i, value);
+                            obj.write()
+                                .map_err(AiScriptError::internal)?
+                                .insert(i, value);
                             value_stack.push(Value::null());
                         }
-                        _ => Err(AiScriptRuntimeError::Runtime(format!(
+                        _ => Err(AiScriptRuntimeError::runtime(format!(
                             "Cannot read prop ({}) of {}.",
                             i.value.repr_value(),
                             assignee.value.display_type()
@@ -728,18 +725,21 @@ impl Interpreter {
                     }
                 }
                 Frame::AssignProp { name, value } => {
-                    let assignee = value_stack.pop().unwrap();
+                    let assignee = value_stack.pop_value()?;
                     let assignee = VObj::try_from(assignee)?;
-                    assignee.write().unwrap().insert(name, value);
+                    assignee
+                        .write()
+                        .map_err(AiScriptError::internal)?
+                        .insert(name, value);
                 }
                 Frame::AddAssign1 { dest, expr } => {
-                    let target = value_stack.pop().unwrap();
+                    let target = value_stack.pop_value()?;
                     let target = f64::try_from(target)?;
                     stack.push(Frame::AddAssign2 { dest, target });
-                    eval(expr, &mut stack);
+                    stack.eval(expr);
                 }
                 Frame::AddAssign2 { dest, target } => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     let v = f64::try_from(v)?;
                     stack.push(Frame::Assign2 {
                         dest,
@@ -747,13 +747,13 @@ impl Interpreter {
                     });
                 }
                 Frame::SubAssign1 { dest, expr } => {
-                    let target = value_stack.pop().unwrap();
+                    let target = value_stack.pop_value()?;
                     let target = f64::try_from(target)?;
                     stack.push(Frame::SubAssign2 { dest, target });
-                    eval(expr, &mut stack);
+                    stack.eval(expr);
                 }
                 Frame::SubAssign2 { dest, target } => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     let v = f64::try_from(v)?;
                     stack.push(Frame::Assign2 {
                         dest,
@@ -765,25 +765,25 @@ impl Interpreter {
                     mut elseif,
                     else_,
                 } => {
-                    let cond = value_stack.pop().unwrap();
+                    let cond = value_stack.pop_value()?;
                     let cond = bool::try_from(cond)?;
                     if cond {
-                        eval(then, &mut stack);
+                        stack.eval(then);
                     } else if let Some(ast::Elseif { cond, then }) = elseif.pop() {
                         stack.push(Frame::If {
                             then,
                             elseif,
                             else_,
                         });
-                        eval(cond, &mut stack);
+                        stack.eval(cond);
                     } else if let Some(else_) = else_ {
-                        eval(*else_, &mut stack);
+                        stack.eval(*else_);
                     } else {
                         value_stack.push(Value::null());
                     }
                 }
                 Frame::Match1 { mut qs, default } => {
-                    let about = value_stack.pop().unwrap();
+                    let about = value_stack.pop_value()?;
                     qs.reverse();
                     stack.push(Frame::Match2 { about, qs, default });
                 }
@@ -799,9 +799,9 @@ impl Interpreter {
                             qs,
                             default,
                         });
-                        eval(q, &mut stack);
+                        stack.eval(q);
                     } else if let Some(default) = default {
-                        eval(*default, &mut stack);
+                        stack.eval(*default);
                     } else {
                         value_stack.push(Value::null());
                     }
@@ -812,14 +812,14 @@ impl Interpreter {
                     qs,
                     default,
                 } => {
-                    let q = value_stack.pop().unwrap();
+                    let q = value_stack.pop_value()?;
                     if about == q {
-                        eval(*a, &mut stack);
+                        stack.eval(*a);
                     } else {
                         stack.push(Frame::Match2 { about, qs, default });
                     }
                 }
-                Frame::Block => scope = *scope.parent.unwrap(),
+                Frame::Block => scope = scope.get_parent()?,
                 Frame::Tmpl1 { mut tmpl, mut str } => {
                     if let Some(x) = tmpl.pop() {
                         match x {
@@ -829,7 +829,7 @@ impl Interpreter {
                             }
                             ast::StringOrExpression::Expression(x) => {
                                 stack.push(Frame::Tmpl2 { tmpl, str });
-                                eval(x, &mut stack);
+                                stack.eval(x);
                             }
                         }
                     } else {
@@ -837,60 +837,60 @@ impl Interpreter {
                     }
                 }
                 Frame::Tmpl2 { tmpl, mut str } => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     str += &v.repr_value().to_string();
                     stack.push(Frame::Tmpl1 { tmpl, str });
                 }
                 Frame::Obj1 { mut obj, map } => {
                     if let Some((k, v)) = obj.pop() {
                         stack.push(Frame::Obj2 { obj, map, k });
-                        eval(v, &mut stack);
+                        stack.eval(v);
                     } else {
                         value_stack.push(Value::obj(*map));
                     }
                 }
                 Frame::Obj2 { obj, mut map, k } => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     map.insert(k, v);
                     stack.push(Frame::Obj1 { obj, map });
                 }
                 Frame::Not => {
-                    let v = value_stack.pop().unwrap();
+                    let v = value_stack.pop_value()?;
                     let v = bool::try_from(v)?;
                     value_stack.push(Value::bool(!v));
                 }
                 Frame::And1 { right } => {
-                    let left_value = value_stack.pop().unwrap();
+                    let left_value = value_stack.pop_value()?;
                     let left_value = bool::try_from(left_value)?;
                     if !left_value {
                         value_stack.push(Value::bool(left_value))
                     } else {
                         stack.push(Frame::And2);
-                        eval(right, &mut stack);
+                        stack.eval(right);
                     }
                 }
                 Frame::And2 => {
-                    let right_value = value_stack.pop().unwrap();
+                    let right_value = value_stack.pop_value()?;
                     let right_value = bool::try_from(right_value)?;
                     value_stack.push(Value::bool(right_value))
                 }
                 Frame::Or1 { right } => {
-                    let left_value = value_stack.pop().unwrap();
+                    let left_value = value_stack.pop_value()?;
                     let left_value = bool::try_from(left_value)?;
                     if left_value {
                         value_stack.push(Value::bool(left_value))
                     } else {
                         stack.push(Frame::Or2);
-                        eval(right, &mut stack);
+                        stack.eval(right);
                     }
                 }
                 Frame::Or2 => {
-                    let right_value = value_stack.pop().unwrap();
+                    let right_value = value_stack.pop_value()?;
                     let right_value = bool::try_from(right_value)?;
                     value_stack.push(Value::bool(right_value))
                 }
                 Frame::Call1 { args } => {
-                    let callee = value_stack.pop().unwrap();
+                    let callee = value_stack.pop_value()?;
                     let callee = VFn::try_from(callee)?;
                     let args =
                         try_join_all(args.into_iter().map(|arg| self.run(vec![arg], &scope)))
@@ -912,7 +912,7 @@ impl Interpreter {
                         .collect();
                         stack.push(Frame::Call3 { scope });
                         scope = fn_scope.create_child_scope(args);
-                        run(statements, &mut stack);
+                        stack.run(statements);
                     }
                     VFn::FnNative(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);
@@ -922,38 +922,45 @@ impl Interpreter {
                     scope: previous_scope,
                 } => {
                     scope = previous_scope;
-                    let r = value_stack.pop().unwrap();
+                    let r = value_stack.pop_value()?;
                     value_stack.push(unwrap_ret(r));
                 }
                 Frame::Index => {
-                    let i = value_stack.pop().unwrap();
-                    let target = value_stack.pop().unwrap();
+                    let i = value_stack.pop_value()?;
+                    let target = value_stack.pop_value()?;
                     match *target.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
                             let item = if i.trunc() == i {
-                                arr.read().unwrap().get(i as usize).cloned()
+                                arr.read()
+                                    .map_err(AiScriptError::internal)?
+                                    .get(i as usize)
+                                    .cloned()
                             } else {
                                 None
                             };
                             value_stack.push(if let Some(item) = item {
                                 item
                             } else {
-                                Err(AiScriptRuntimeError::IndexOutOfRange(
+                                Err(AiScriptRuntimeError::index_out_of_range(
                                     i,
-                                    arr.read().unwrap().len() as isize - 1,
+                                    arr.read().map_err(AiScriptError::internal)?.len() as isize - 1,
                                 ))?
                             });
                         }
                         V::Obj(obj) => {
                             let i = String::try_from(i)?;
-                            value_stack.push(if let Some(item) = obj.read().unwrap().get(&i) {
-                                item.clone()
-                            } else {
-                                Value::null()
-                            });
+                            value_stack.push(
+                                if let Some(item) =
+                                    obj.read().map_err(AiScriptError::internal)?.get(&i)
+                                {
+                                    item.clone()
+                                } else {
+                                    Value::null()
+                                },
+                            );
                         }
-                        target => Err(AiScriptRuntimeError::Runtime(format!(
+                        target => Err(AiScriptRuntimeError::runtime(format!(
                             "Cannot read prop ({}) of {}.",
                             i.value.repr_value(),
                             target.display_type(),
@@ -961,9 +968,11 @@ impl Interpreter {
                     }
                 }
                 Frame::Prop { name } => {
-                    let value = value_stack.pop().unwrap();
+                    let value = value_stack.pop_value()?;
                     value_stack.push(if let V::Obj(value) = *value.value {
-                        if let Some(value) = value.read().unwrap().get(&name) {
+                        if let Some(value) =
+                            value.read().map_err(AiScriptError::internal)?.get(&name)
+                        {
                             value.clone()
                         } else {
                             Value::null()
@@ -978,12 +987,12 @@ impl Interpreter {
                     }
                 }
                 Frame::Unwind => {
-                    if let Some(v) = value_stack.last() {
-                        if let V::Return(_) | V::Break | V::Continue = *v.value {
-                            while let Some(frame) = stack.pop() {
-                                if let Frame::Run = frame {
-                                    break;
-                                }
+                    if let Some(v) = value_stack.last()
+                        && let V::Return(_) | V::Break | V::Continue = *v.value
+                    {
+                        while let Some(frame) = stack.pop() {
+                            if let Frame::Run = frame {
+                                break;
                             }
                         }
                     }
@@ -993,18 +1002,16 @@ impl Interpreter {
                         return Ok(Value::null());
                     }
                     let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
-                    if let Some(max_step) = self.max_step {
-                        if step_count > max_step {
-                            Err(AiScriptRuntimeError::Runtime(
-                                "max step exceeded".to_string(),
-                            ))?
-                        }
+                    if let Some(max_step) = self.max_step
+                        && step_count > max_step
+                    {
+                        Err(AiScriptRuntimeError::runtime("max step exceeded"))?
                     }
                 }
             }
         }
 
-        Ok(value_stack.pop().unwrap())
+        value_stack.pop_value()
     }
 
     pub async fn register_abort_handler(

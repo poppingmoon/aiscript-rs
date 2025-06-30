@@ -9,7 +9,7 @@ use super::{value::Value, variable::Variable};
 
 #[derive(Clone, Debug, Default)]
 pub struct Scope {
-    pub parent: Option<Box<Scope>>,
+    parent: Option<Box<Scope>>,
     states: Arc<RwLock<HashMap<String, Variable>>>,
     ns_name: Option<String>,
 }
@@ -68,7 +68,7 @@ impl Scope {
             } else if let Some(parent) = &self.parent {
                 parent.get_(name, scope_name).await
             } else {
-                Err(AiScriptRuntimeError::Runtime(format!(
+                Err(AiScriptRuntimeError::runtime(format!(
                     "No such variable '{name}' in scope '{scope_name}'",
                 )))?
             }
@@ -109,7 +109,7 @@ impl Scope {
     ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
             if self.states.read().await.contains_key(name) {
-                Err(AiScriptRuntimeError::Runtime(format!(
+                Err(AiScriptRuntimeError::runtime(format!(
                     "Variable '{name}' already exists in scope '{}'",
                     self.name()
                 )))?
@@ -118,10 +118,10 @@ impl Scope {
                     .write()
                     .await
                     .insert(name.to_string(), variable.clone());
-                if let Some(parent) = &self.parent {
-                    if let Some(ns_name) = &self.ns_name {
-                        parent.add(&format!("{ns_name}:{name}"), variable).await?;
-                    }
+                if let Some(parent) = &self.parent
+                    && let Some(ns_name) = &self.ns_name
+                {
+                    parent.add(&format!("{ns_name}:{name}"), variable).await?;
                 }
                 Ok(())
             }
@@ -154,20 +154,27 @@ impl Scope {
                         .insert(name.to_string(), Variable::Mut(val));
                     Ok(())
                 }
-                Some(false) => Err(AiScriptRuntimeError::Runtime(format!(
+                Some(false) => Err(AiScriptRuntimeError::runtime(format!(
                     "Cannot assign to an immutable variable {name}."
                 )))?,
                 None => {
                     if let Some(parent) = &self.parent {
                         parent.assign_(name, val, scope_name).await
                     } else {
-                        Err(AiScriptRuntimeError::Runtime(format!(
-                            "No such variable '{name}' in scope '{scope_name}"
+                        Err(AiScriptRuntimeError::runtime(format!(
+                            "No such variable '{name}' in scope '{scope_name}'"
                         )))?
                     }
                 }
             }
         }
         .boxed()
+    }
+
+    pub fn get_parent(self) -> Result<Scope, AiScriptError> {
+        self.parent.map_or_else(
+            || Err(AiScriptError::internal("scope has no parent")),
+            |parent| Ok(*parent),
+        )
     }
 }

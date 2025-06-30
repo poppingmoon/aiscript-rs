@@ -55,8 +55,8 @@ impl Parser {
     }
 
     pub fn parse(&self, input: &str) -> Result<Vec<ast::Node>, AiScriptError> {
-        let code = preprocess(input).map_err(AiScriptSyntaxError::Parse)?;
-        let nodes: Vec<node::Node> = main(&code).map_err(AiScriptSyntaxError::Parse)?;
+        let code = preprocess(input).map_err(AiScriptSyntaxError::parse)?;
+        let nodes: Vec<node::Node> = main(&code).map_err(AiScriptSyntaxError::parse)?;
         let nodes = self
             .plugins
             .validate

@@ -51,7 +51,7 @@ impl Visitor for KeywordValidator {
         namespace: cst::Namespace,
     ) -> Result<cst::Namespace, AiScriptError> {
         if RESERVED_WORD.contains(&namespace.name.as_str()) {
-            Err(AiScriptSyntaxError::ReservedWord(namespace.name))?
+            Err(AiScriptSyntaxError::reserved_word(namespace.name))?
         } else {
             Ok(namespace)
         }
@@ -62,7 +62,7 @@ impl Visitor for KeywordValidator {
             cst::Meta {
                 name: Some(name), ..
             } if RESERVED_WORD.contains(&name.as_str()) => {
-                Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
+                Err(AiScriptSyntaxError::reserved_word(name))?
             }
             _ => Ok(meta),
         }
@@ -79,7 +79,7 @@ impl Visitor for KeywordValidator {
         }
         .map(|name| {
             if RESERVED_WORD.contains(&name.as_str()) {
-                Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
+                Err(AiScriptSyntaxError::reserved_word(name))?
             } else {
                 Ok(())
             }
@@ -95,9 +95,7 @@ impl Visitor for KeywordValidator {
         match &expression {
             cst::Expression::Identifier(identifier) => {
                 if RESERVED_WORD.contains(&identifier.name.as_str()) {
-                    Err(AiScriptSyntaxError::ReservedWord(
-                        identifier.name.to_string(),
-                    ))?
+                    Err(AiScriptSyntaxError::reserved_word(&identifier.name))?
                 } else {
                     Ok(expression)
                 }
@@ -105,7 +103,7 @@ impl Visitor for KeywordValidator {
             cst::Expression::Fn(fn_) => {
                 for arg in &fn_.args {
                     if RESERVED_WORD.contains(&arg.name.as_str()) {
-                        Err(AiScriptSyntaxError::ReservedWord(arg.name.to_string()))?
+                        Err(AiScriptSyntaxError::reserved_word(&arg.name))?
                     }
                 }
                 Ok(expression)
@@ -121,7 +119,7 @@ impl Visitor for KeywordValidator {
         match &chain_member {
             cst::ChainMember::PropChain(cst::PropChain { name, .. }) => {
                 if RESERVED_WORD.contains(&name.as_str()) {
-                    Err(AiScriptSyntaxError::ReservedWord(name.to_string()))?
+                    Err(AiScriptSyntaxError::reserved_word(name))?
                 } else {
                     Ok(chain_member)
                 }

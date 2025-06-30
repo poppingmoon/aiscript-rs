@@ -23,7 +23,7 @@ async fn test(program: &str, test: fn(Value)) -> Result<Value, AiScriptError> {
         Some(move |value| {
             test(value);
             test_count_clone.fetch_add(1, Ordering::Relaxed);
-            async move {}.boxed()
+            async {}.boxed()
         }),
         None::<fn(_) -> _>,
         Some(9999),
@@ -5600,7 +5600,7 @@ mod std {
                 r#"
                 <: [
                     Json:parsable('')
-                    Json:stringify(Json:parse(''))
+                    Json:parse('')
                 ]
                 "#,
                 |res| assert_eq!(res, arr([bool(false), error("not_json", None)])),
@@ -5612,7 +5612,7 @@ mod std {
                 r#"
                 <: [
                     Json:parsable('hoge')
-                    Json:stringify(Json:parse('hoge'))
+                    Json:parse('hoge')
                 ]
                 "#,
                 |res| assert_eq!(res, arr([bool(false), error("not_json", None)])),
@@ -5624,7 +5624,7 @@ mod std {
                 r#"
                 <: [
                     Json:parsable('[')
-                    Json:stringify(Json:parse('['))
+                    Json:parse('[')
                 ]
                 "#,
                 |res| assert_eq!(res, arr([bool(false), error("not_json", None)])),

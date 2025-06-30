@@ -37,10 +37,18 @@ impl PartialEq for V {
             (Self::Num(l0), Self::Num(r0)) => l0 == r0,
             (Self::Str(l0), Self::Str(r0)) => l0 == r0,
             (Self::Arr(l0), Self::Arr(r0)) => {
-                l0.read().unwrap().clone() == r0.read().unwrap().clone()
+                if let (Ok(l0), Ok(r0)) = (l0.read(), r0.read()) {
+                    l0.clone() == r0.clone()
+                } else {
+                    false
+                }
             }
             (Self::Obj(l0), Self::Obj(r0)) => {
-                l0.read().unwrap().clone() == r0.read().unwrap().clone()
+                if let (Ok(l0), Ok(r0)) = (l0.read(), r0.read()) {
+                    l0.clone() == r0.clone()
+                } else {
+                    false
+                }
             }
             (Self::Fn(_), Self::Fn(_)) => false,
             (Self::Return(l0), Self::Return(r0)) => l0 == r0,

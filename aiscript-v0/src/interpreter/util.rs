@@ -16,9 +16,7 @@ use crate::error::{AiScriptError, AiScriptRuntimeError};
 use super::value::{V, VArr, VFn, VObj, Value};
 
 pub fn expect_any(val: Option<Value>) -> Result<Value, AiScriptError> {
-    Ok(val.ok_or_else(|| {
-        AiScriptRuntimeError::Runtime("Expect anything, but got nothing.".to_string())
-    })?)
+    Ok(val.ok_or_else(|| AiScriptRuntimeError::runtime("Expect anything, but got nothing."))?)
 }
 
 impl TryFrom<V> for bool {
@@ -28,8 +26,8 @@ impl TryFrom<V> for bool {
         if let V::Bool(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect boolean, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect boolean, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -51,8 +49,8 @@ impl TryFrom<V> for VFn {
         if let V::Fn(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect function, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect function, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -74,8 +72,8 @@ impl TryFrom<V> for String {
         if let V::Str(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect string, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect string, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -97,8 +95,8 @@ impl TryFrom<V> for f64 {
         if let V::Num(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect number, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect number, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -120,8 +118,8 @@ impl TryFrom<V> for VObj {
         if let V::Obj(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect object, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect object, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -140,7 +138,10 @@ impl TryFrom<V> for IndexMap<String, Value> {
     type Error = AiScriptError;
 
     fn try_from(value: V) -> Result<Self, Self::Error> {
-        Ok(VObj::try_from(value)?.read().unwrap().clone())
+        Ok(VObj::try_from(value)?
+            .read()
+            .map_err(AiScriptError::internal)?
+            .clone())
     }
 }
 
@@ -159,8 +160,8 @@ impl TryFrom<V> for VArr {
         if let V::Arr(value) = value {
             Ok(value)
         } else {
-            Err(AiScriptRuntimeError::Runtime(format!(
-                "Expect array, but got {}",
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Expect array, but got {}.",
                 value.display_type(),
             )))?
         }
@@ -179,7 +180,10 @@ impl TryFrom<V> for Vec<Value> {
     type Error = AiScriptError;
 
     fn try_from(value: V) -> Result<Self, Self::Error> {
-        Ok(VArr::try_from(value)?.read().unwrap().clone())
+        Ok(VArr::try_from(value)?
+            .read()
+            .map_err(AiScriptError::internal)?
+            .clone())
     }
 }
 
@@ -201,9 +205,9 @@ impl std::fmt::Display for V {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.display_type().fmt(f)?;
         match self {
-            V::Num(value) => write!(f, "<{}>", value),
-            V::Bool(value) => write!(f, "<{}>", value),
-            V::Str(value) => write!(f, "<\"{}\">", value),
+            V::Num(value) => write!(f, "<{value}>"),
+            V::Bool(value) => write!(f, "<{value}>"),
+            V::Str(value) => write!(f, "<\"{value}\">"),
             V::Fn { .. } => write!(f, "<...>"),
             V::Obj(_) => write!(f, "<..>"),
             V::Null => write!(f, "<>"),
@@ -268,15 +272,15 @@ pub struct DisplaySimple<'a>(&'a V);
 impl std::fmt::Display for DisplaySimple<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0 {
-            V::Num(value) => write!(f, "{}", value),
-            V::Bool(value) => write!(f, "{}", value),
-            V::Str(value) => write!(f, "\"{}\"", value),
+            V::Num(value) => write!(f, "{value}"),
+            V::Bool(value) => write!(f, "{value}"),
+            V::Str(value) => write!(f, "\"{value}\""),
             V::Arr(value) => write!(
                 f,
                 "[{}]",
                 value
                     .read()
-                    .unwrap()
+                    .map_err(|_| std::fmt::Error)?
                     .iter()
                     .map(|value| value.display_simple().to_string())
                     .collect::<Vec<String>>()
@@ -336,7 +340,7 @@ impl Serialize for VWithMemo {
                     let mut processed_arrays = (*self.processed_arrays).clone();
                     processed_arrays.push(value.clone());
                     let processed_arrays = Rc::new(processed_arrays);
-                    let value = value.read().unwrap();
+                    let value = value.read().map_err(ser::Error::custom)?;
                     let mut seq = serializer.serialize_seq(Some(value.len()))?;
                     for e in value.iter() {
                         seq.serialize_element(&VWithMemo {
@@ -355,7 +359,7 @@ impl Serialize for VWithMemo {
                     let mut processed_objects = (*self.processed_objects).clone();
                     processed_objects.push(value.clone());
                     let processed_objects = Rc::new(processed_objects);
-                    let value = value.read().unwrap();
+                    let value = value.read().map_err(ser::Error::custom)?;
                     let mut map = serializer.serialize_map(Some(value.len()))?;
                     for (k, v) in value.iter() {
                         map.serialize_entry(
@@ -463,7 +467,7 @@ impl<'de> Visitor<'de> for VVisitor {
 }
 
 pub fn get_lang_version(input: &str) -> Option<String> {
-    let re = Regex::new(r"^\s*///\s*@\s*([a-zA-Z0-9_.-]+)(?:[\r\n][\s\S]*)?$").unwrap();
+    let re = Regex::new(r"^\s*///\s*@\s*([a-zA-Z0-9_.-]+)(?:[\r\n][\s\S]*)?$").ok()?;
     re.captures(input).map(|captures| captures[1].to_string())
 }
 
@@ -518,10 +522,10 @@ impl std::fmt::Display for ReprValue<'_> {
                             .replace('\n', "\\n")
                     )
                 } else {
-                    write!(f, "{}", value)
+                    write!(f, "{value}")
                 }
             }
-            V::Num(value) => write!(f, "{}", value),
+            V::Num(value) => write!(f, "{value}"),
             V::Arr(value) => {
                 if self.processed_arrays.iter().any(|v| Arc::ptr_eq(v, value)) {
                     write!(f, "...")
@@ -534,7 +538,7 @@ impl std::fmt::Display for ReprValue<'_> {
                         "[ {} ]",
                         value
                             .read()
-                            .unwrap()
+                            .map_err(|_| std::fmt::Error)?
                             .iter()
                             .map(|value| ReprValue {
                                 value: &value.value,
@@ -560,7 +564,7 @@ impl std::fmt::Display for ReprValue<'_> {
                         "{{ {} }}",
                         value
                             .read()
-                            .unwrap()
+                            .map_err(|_| std::fmt::Error)?
                             .iter()
                             .map(|(key, val)| format!(
                                 "{key}: {}",
@@ -576,7 +580,7 @@ impl std::fmt::Display for ReprValue<'_> {
                     )
                 }
             }
-            V::Bool(value) => write!(f, "{}", value),
+            V::Bool(value) => write!(f, "{value}"),
             V::Null => write!(f, "null"),
             V::Fn(value) => write!(
                 f,

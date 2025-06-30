@@ -73,7 +73,7 @@ fn set_attribute_statement_or_expression(
             }
             _ => {
                 if !stocked_attrs.is_empty() {
-                    Err(AiScriptSyntaxError::Attribute)?
+                    Err(AiScriptSyntaxError::attribute())?
                 }
                 let node = match node {
                     cst::StatementOrExpression::Expression(expression) => {
@@ -104,7 +104,7 @@ fn set_attribute_statement_or_expression(
         }
     }
     if !stocked_attrs.is_empty() {
-        Err(AiScriptSyntaxError::Attribute)?
+        Err(AiScriptSyntaxError::attribute())?
     }
 
     Ok(result)
