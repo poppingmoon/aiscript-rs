@@ -23,6 +23,7 @@ use crate::{
 };
 
 use self::{
+    builder::InterpreterBuilder,
     frame::Frame,
     lib::std::std,
     primitive_props::get_prim_prop,
@@ -33,6 +34,7 @@ use self::{
     variable::Variable,
 };
 
+pub mod builder;
 mod frame;
 mod lib;
 mod primitive_props;
@@ -123,6 +125,10 @@ impl Interpreter {
             },
             max_step,
         }
+    }
+
+    pub fn builder() -> InterpreterBuilder {
+        InterpreterBuilder::default()
     }
 
     pub async fn exec(&self, script: Vec<ast::Node>) -> Result<Option<Value>, AiScriptError> {

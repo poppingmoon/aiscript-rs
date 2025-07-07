@@ -9,18 +9,8 @@ Rust implementation of [AiScript](https://github.com/aiscript-dev/aiscript)
 
 ```rust
 use aiscript::v0::{Interpreter, Parser};
-use futures::FutureExt;
 
 let script = Parser::default().parse("<: 'Hello, world!'")?;
-let interpreter = Interpreter::new(
-    [],
-    None::<fn(_) -> _>,
-    Some(|v| {
-        println!("{v}");
-        async move {}.boxed()
-    }),
-    None::<fn(_) -> _>,
-    None,
-);
+let interpreter = Interpreter::builder().out_sync(|v| println!("{v}")).build();
 interpreter.exec(script).await?;
 ```

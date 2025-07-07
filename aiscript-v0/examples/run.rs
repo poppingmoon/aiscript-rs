@@ -3,8 +3,7 @@ use std::{
     io::{prelude::*, stdin, stdout},
 };
 
-use aiscript_v0::{Interpreter, Parser, values::Value};
-use futures::FutureExt;
+use aiscript_v0::{Interpreter, Parser};
 
 #[tokio::main]
 async fn main() {
@@ -12,25 +11,17 @@ async fn main() {
     let mut s = String::new();
     file.read_to_string(&mut s).unwrap();
     let script = Parser::default().parse(&s).unwrap();
-    let aiscript = Interpreter::new(
-        [],
-        Some(|q| {
+    let aiscript = Interpreter::builder()
+        .in_sync(|q| {
             print!("{q}");
             stdout().flush().unwrap();
             let mut buf = String::new();
             stdin().read_line(&mut buf).unwrap();
-            async move { buf }.boxed()
-        }),
-        Some(|v: Value| {
-            println!("{}", v.value.repr_value());
-            async move {}.boxed()
-        }),
-        Some(|e| {
-            eprintln!("{e}");
-            async move {}.boxed()
-        }),
-        None,
-    );
+            buf
+        })
+        .out_sync(|v| println!("{}", v.value.repr_value()))
+        .err_sync(|e| eprintln!("{e}"))
+        .build();
     println!(
         "{}",
         aiscript

@@ -4,7 +4,6 @@ use aiscript_v0::{
     Interpreter, Parser,
     values::{V, Value},
 };
-use futures::FutureExt;
 use rustyline::error::ReadlineError;
 use rustyline::{DefaultEditor, Result};
 
@@ -12,25 +11,17 @@ use rustyline::{DefaultEditor, Result};
 async fn main() -> Result<()> {
     let mut rl = DefaultEditor::new()?;
     let parser = Parser::default();
-    let aiscript = Interpreter::new(
-        [],
-        Some(|q| {
+    let aiscript = Interpreter::builder()
+        .in_sync(|q| {
             print!("{q}");
             stdout().flush().unwrap();
             let mut buf = String::new();
             stdin().read_line(&mut buf).unwrap();
-            async move { buf }.boxed()
-        }),
-        Some(|v: Value| {
-            println!("{}", v.value.repr_value());
-            async move {}.boxed()
-        }),
-        Some(|e| {
-            eprintln!("Error: {e}");
-            async move {}.boxed()
-        }),
-        None,
-    );
+            buf
+        })
+        .out_sync(|v| println!("{}", v.value.repr_value()))
+        .err_sync(|e| eprintln!("[Error] {e}"))
+        .build();
     let mut input = String::new();
     println!("Welcome to AiScript!");
     println!("https://github.com/aiscript-dev/aiscript");

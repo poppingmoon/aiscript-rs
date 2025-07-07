@@ -5,21 +5,11 @@
 //! ```
 //! use aiscript_v0::{Interpreter, Parser};
 //! # use aiscript_v0::errors::AiScriptError;
-//! use futures::FutureExt;
 //!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), AiScriptError> {
 //! let script = Parser::default().parse("<: 'Hello, world!'")?;
-//! let interpreter = Interpreter::new(
-//!     [],
-//!     None::<fn(_) -> _>,
-//!     Some(|v| {
-//!         println!("{v}");
-//!         async move {}.boxed()
-//!     }),
-//!     None::<fn(_) -> _>,
-//!     None,
-//! );
+//! let interpreter = Interpreter::builder().out_sync(|v| println!("{v}")).build();
 //! interpreter.exec(script).await?;
 //! # Ok(())
 //! # }
