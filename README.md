@@ -3,7 +3,6 @@
 [![CI](https://github.com/poppingmoon/aiscript-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/poppingmoon/aiscript-rs/actions/workflows/ci.yml)
 
 Rust implementation of [AiScript](https://github.com/aiscript-dev/aiscript)
-(Experimental)
 
 ## Example
 
