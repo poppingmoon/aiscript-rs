@@ -45,10 +45,10 @@ async fn main() -> Result<()> {
                         rl.add_history_entry(&input)?;
                         input.clear();
                         let result = aiscript.exec(script).await.unwrap();
-                        if let Some(Value { value, .. }) = result {
-                            if *value != V::Null {
-                                println!("{}", value.repr_value());
-                            }
+                        if let Some(Value { value, .. }) = result
+                            && *value != V::Null
+                        {
+                            println!("{}", value.repr_value());
                         }
                     }
                     Err(err) => {
