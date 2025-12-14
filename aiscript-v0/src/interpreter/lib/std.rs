@@ -1326,11 +1326,11 @@ pub fn std() -> HashMap<String, Value> {
             let result = f64::try_from(args.next().unwrap_or_default()).and_then(|length| {
                 if length < 0.0 {
                     Err(AiScriptRuntimeError::runtime(
-                        "arr.repeat expected non-negative number, got negative",
+                        "Arr:create expected non-negative number, got negative",
                     ))?
                 } else if length.trunc() != length {
                     Err(AiScriptRuntimeError::runtime(
-                        "arr.repeat expected integer, got non-integer",
+                        "Arr:create expected integer, got non-integer",
                     ))?
                 } else {
                     let initial = args.next().unwrap_or_default();

@@ -23,7 +23,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async { result }.boxed()
             }),
             _ => Err(AiScriptRuntimeError::runtime(format!(
-                "No such prop ({name}) in number."
+                "No such prop ({name}) in num."
             )))?,
         },
         V::Str(target) => match name {
@@ -322,7 +322,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async { result }.boxed()
             }),
             _ => Err(AiScriptRuntimeError::runtime(format!(
-                "No such prop ({name}) in string."
+                "No such prop ({name}) in str."
             )))?,
         },
         V::Arr(target) => match name {
@@ -986,14 +986,14 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async { result }.boxed()
             }),
             _ => Err(AiScriptRuntimeError::runtime(format!(
-                "No such prop ({name}) in string."
+                "No such prop ({name}) in arr."
             )))?,
         },
         V::Error { value, info } => match name {
             "name" => Value::str(value),
             "info" => info.map_or_else(Value::null, |info| *info),
             _ => Err(AiScriptRuntimeError::runtime(format!(
-                "No such prop ({name}) in number."
+                "No such prop ({name}) in error."
             )))?,
         },
         value => Err(AiScriptRuntimeError::runtime(format!(
