@@ -1,0 +1,25 @@
+[package]
+name = "aiscript-v1"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4"
+futures = "0.3"
+indexmap = "2.3"
+nom = "8.0"
+nom_locate = "5.0"
+percent-encoding = "2.3"
+rand = "0.9"
+regex = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+thiserror = "2.0"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+unicode-segmentation = "1.11"
+uuid = { version = "1.10", features = ["v4"] }
+
+[dev-dependencies]
+paste = "1.0"
+rustyline = "17.0"
+tokio = { version = "1", features = ["rt-multi-thread"] }

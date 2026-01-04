@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 aiscript-v0 = { path = "../aiscript-v0" }
+aiscript-v1 = { path = "../aiscript-v1" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread"] }
