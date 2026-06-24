@@ -528,7 +528,7 @@ impl Interpreter {
                 Frame::Each3 { var, items, for_ } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match *v.value {
+                    match v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
                         _ => stack.push(Frame::Each2 { var, items, for_ }),
@@ -557,7 +557,7 @@ impl Interpreter {
                 }
                 Frame::For3 { i, times, for_ } => {
                     let v = value_stack.pop_value()?;
-                    match *v.value {
+                    match v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
                         _ => stack.push(Frame::For2 {
@@ -613,7 +613,7 @@ impl Interpreter {
                 } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match *v.value {
+                    match v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
                         _ => stack.push(Frame::ForLet3 {
@@ -634,7 +634,7 @@ impl Interpreter {
                 Frame::Loop2 { statements } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match *v.value {
+                    match v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
                         _ => stack.push(Frame::Loop1 { statements }),
@@ -697,7 +697,7 @@ impl Interpreter {
                 Frame::AssignIndex { value } => {
                     let i = value_stack.pop_value()?;
                     let assignee = value_stack.pop_value()?;
-                    match *assignee.value {
+                    match assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
                             if i.trunc() == i
@@ -934,7 +934,7 @@ impl Interpreter {
                 Frame::Index => {
                     let i = value_stack.pop_value()?;
                     let target = value_stack.pop_value()?;
-                    match *target.value {
+                    match target.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
                             let item = if i.trunc() == i {
@@ -975,7 +975,7 @@ impl Interpreter {
                 }
                 Frame::Prop { name } => {
                     let value = value_stack.pop_value()?;
-                    value_stack.push(if let V::Obj(value) = *value.value {
+                    value_stack.push(if let V::Obj(value) = value.value {
                         if let Some(value) =
                             value.read().map_err(AiScriptError::internal)?.get(&name)
                         {
@@ -994,7 +994,7 @@ impl Interpreter {
                 }
                 Frame::Unwind => {
                     if let Some(v) = value_stack.last()
-                        && let V::Return(_) | V::Break | V::Continue = *v.value
+                        && let V::Return(_) | V::Break | V::Continue = v.value
                     {
                         while let Some(frame) = stack.pop() {
                             if let Frame::Run = frame {

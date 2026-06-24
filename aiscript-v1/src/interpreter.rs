@@ -807,7 +807,7 @@ impl Interpreter {
                 } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match &*v.value {
+                    match &v.value {
                         V::Break { label: l, .. } => {
                             value_stack.push(if l.is_some() && *l != label {
                                 v
@@ -872,7 +872,7 @@ impl Interpreter {
                         scope = scope.get_parent()?;
                     }
                     let v = value_stack.pop_value()?;
-                    match &*v.value {
+                    match &v.value {
                         V::Break { label: l, .. } => {
                             value_stack.push(if l.is_some() && *l != label {
                                 v
@@ -965,7 +965,7 @@ impl Interpreter {
                 } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match &*v.value {
+                    match &v.value {
                         V::Break { label: l, .. } => {
                             value_stack.push(if l.is_some() && *l != label {
                                 v
@@ -997,7 +997,7 @@ impl Interpreter {
                 Frame::Loop2 { label, statements } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
-                    match &*v.value {
+                    match &v.value {
                         V::Break { label: l, .. } => {
                             value_stack.push(if l.is_some() && *l != label {
                                 v
@@ -1113,7 +1113,7 @@ impl Interpreter {
                     if i.is_control() {
                         value_stack.push(i);
                     } else {
-                        match *assignee.value {
+                        match assignee.value {
                             V::Arr(arr) => {
                                 let i = f64::try_from(i)?;
                                 let index = i as usize;
@@ -1653,7 +1653,7 @@ impl Interpreter {
                     if i.is_control() {
                         value_stack.push(i);
                     } else {
-                        match *target.value {
+                        match target.value {
                             V::Arr(arr) => {
                                 let i = f64::try_from(i)?;
                                 let item = if i.trunc() == i {
@@ -1697,7 +1697,7 @@ impl Interpreter {
 
                     value_stack.push(if target.is_control() {
                         target
-                    } else if let V::Obj(value) = *target.value {
+                    } else if let V::Obj(value) = target.value {
                         value
                             .read()
                             .map_err(AiScriptError::internal)?
@@ -1715,7 +1715,7 @@ impl Interpreter {
                 }
                 Frame::Unwind => {
                     if let Some(v) = value_stack.last()
-                        && let V::Return(_) | V::Break { .. } | V::Continue { .. } = *v.value
+                        && let V::Return(_) | V::Break { .. } | V::Continue { .. } = v.value
                     {
                         while let Some(frame) = stack.pop() {
                             if let Frame::Run = frame {

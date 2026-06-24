@@ -1133,7 +1133,7 @@ pub fn std() -> HashMap<String, Value> {
         Value::fn_native(|args, _| {
             let mut args = args.into_iter();
             let result = expect_any(args.next()).map(|seed| {
-                match *seed.value {
+                match seed.value {
                     V::Num(num) => Some(num.to_string()),
                     V::Str(str) => Some(str),
                     _ => None,

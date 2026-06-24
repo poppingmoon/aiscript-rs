@@ -144,14 +144,14 @@ pub struct Attr {
 
 #[derive(Clone, Debug, Default)]
 pub struct Value {
-    pub value: Box<V>,
+    pub value: V,
     pub attr: Option<Vec<Attr>>,
 }
 
 impl Value {
     pub fn new(value: V) -> Self {
         Value {
-            value: value.into(),
+            value,
             attr: None,
         }
     }
@@ -237,7 +237,7 @@ impl Value {
     }
 
     pub fn is_control(&self) -> bool {
-        match *self.value {
+        match &self.value {
             V::Null
             | V::Bool(_)
             | V::Num(_)
@@ -252,7 +252,7 @@ impl Value {
 }
 
 pub fn unwrap_ret(v: Value) -> Value {
-    if let V::Return(value) = *v.value {
+    if let V::Return(value) = v.value {
         *value
     } else {
         v
@@ -260,11 +260,11 @@ pub fn unwrap_ret(v: Value) -> Value {
 }
 
 pub fn unwrap_labeled_break(v: Value, label: Option<String>) -> Value {
-    match *v.value {
+    match v.value {
         V::Break {
             label: Some(l),
             value,
-        } if label.is_some_and(|label| *l == label) => {
+        } if label.is_some_and(|label| l == label) => {
             if let Some(value) = value {
                 *value
             } else {

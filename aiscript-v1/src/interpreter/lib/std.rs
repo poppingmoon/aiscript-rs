@@ -989,7 +989,7 @@ pub fn std() -> HashMap<String, Value> {
         "Math:gen_rng".to_string(),
         Value::fn_native_sync(|args| {
             let seed = expect_any(args.into_iter().next())?;
-            let seed = match *seed.value {
+            let seed = match seed.value {
                 V::Num(num) => num.to_string(),
                 V::Str(str) => str,
                 _ => Err(AiScriptRuntimeError::InvalidSeed)?,

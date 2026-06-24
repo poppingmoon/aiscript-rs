@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
                         input.clear();
                         let result = aiscript.exec(script).await.unwrap();
                         if let Some(Value { value, .. }) = result
-                            && *value != V::Null
+                            && value != V::Null
                         {
                             println!("{}", value.repr_value());
                         }

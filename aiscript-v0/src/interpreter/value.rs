@@ -109,16 +109,13 @@ pub struct Attr {
 
 #[derive(Clone, Debug, Default)]
 pub struct Value {
-    pub value: Box<V>,
+    pub value: V,
     pub attr: Option<Vec<Attr>>,
 }
 
 impl Value {
     pub fn new(value: V) -> Self {
-        Value {
-            value: value.into(),
-            attr: None,
-        }
+        Value { value, attr: None }
     }
 
     pub fn null() -> Self {
@@ -192,7 +189,7 @@ impl Value {
 }
 
 pub fn unwrap_ret(v: Value) -> Value {
-    if let V::Return(value) = *v.value {
+    if let V::Return(value) = v.value {
         *value
     } else {
         v
