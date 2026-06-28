@@ -40,7 +40,7 @@ mod scope {
             )
             .await
             .unwrap();
-        let vars = aiscript.scope.get_all().await;
+        let vars = aiscript.scope.get_all().unwrap();
         assert_ne!(vars.get("a"), None);
         assert_ne!(vars.get("b"), None);
         assert_ne!(vars.get("a"), None);
@@ -316,7 +316,7 @@ mod attribute {
             )
             .await
             .unwrap();
-        assert_eq!(aiscript.scope.get("f").await.unwrap().attr, None);
+        assert_eq!(aiscript.scope.get("f").unwrap().attr, None);
     }
 
     #[tokio::test]
@@ -336,7 +336,7 @@ mod attribute {
             .await
             .unwrap();
         assert_eq!(
-            aiscript.scope.get("f").await.unwrap().attr.unwrap()[..],
+            aiscript.scope.get("f").unwrap().attr.unwrap()[..],
             [Attr {
                 name: "x".to_string(),
                 value: num(42),
@@ -363,7 +363,7 @@ mod attribute {
             .await
             .unwrap();
         assert_eq!(
-            aiscript.scope.get("f").await.unwrap().attr.unwrap()[..],
+            aiscript.scope.get("f").unwrap().attr.unwrap()[..],
             [
                 Attr {
                     name: "o".to_string(),
@@ -398,7 +398,7 @@ mod attribute {
             .await
             .unwrap();
         assert_eq!(
-            aiscript.scope.get("f").await.unwrap().attr.unwrap()[..],
+            aiscript.scope.get("f").unwrap().attr.unwrap()[..],
             [Attr {
                 name: "x".to_string(),
                 value: bool(true),
@@ -425,7 +425,7 @@ mod attribute {
             .await
             .unwrap();
         assert_eq!(
-            aiscript.scope.get("Ns:f").await.unwrap().attr.unwrap()[..],
+            aiscript.scope.get("Ns:f").unwrap().attr.unwrap()[..],
             [Attr {
                 name: "x".to_string(),
                 value: num(42),

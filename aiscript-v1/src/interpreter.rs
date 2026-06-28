@@ -258,9 +258,7 @@ impl Interpreter {
                                     .collect()
                             });
 
-                            ns_scope
-                                .add(identifier.name, Variable::Const(value))
-                                .await?;
+                            ns_scope.add(identifier.name, Variable::Const(value))?;
                         }
                     } else {
                         Err(AiScriptNamespaceError {
@@ -506,7 +504,7 @@ impl Interpreter {
                         stack.run(statements);
                     }
                     ast::Expression::Exists(exists) => {
-                        let exists = scope.exists(&exists.identifier.name).await;
+                        let exists = scope.exists(&exists.identifier.name)?;
                         value_stack.push(Value::bool(exists));
                     }
                     ast::Expression::Tmpl(tmpl) => {
@@ -552,7 +550,7 @@ impl Interpreter {
                         stack.eval(*not.expr);
                     }
                     ast::Expression::Pow(pow) => {
-                        let callee = scope.get("Core:pow").await?;
+                        let callee = scope.get("Core:pow")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Pow { left, right, .. } = *pow;
                         stack.push(Frame::BinOp1 {
@@ -562,7 +560,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Mul(mul) => {
-                        let callee = scope.get("Core:mul").await?;
+                        let callee = scope.get("Core:mul")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Mul { left, right, .. } = *mul;
                         stack.push(Frame::BinOp1 {
@@ -572,7 +570,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Div(div) => {
-                        let callee = scope.get("Core:div").await?;
+                        let callee = scope.get("Core:div")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Div { left, right, .. } = *div;
                         stack.push(Frame::BinOp1 {
@@ -582,7 +580,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Rem(rem) => {
-                        let callee = scope.get("Core:mod").await?;
+                        let callee = scope.get("Core:mod")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Rem { left, right, .. } = *rem;
                         stack.push(Frame::BinOp1 {
@@ -592,7 +590,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Add(add) => {
-                        let callee = scope.get("Core:add").await?;
+                        let callee = scope.get("Core:add")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Add { left, right, .. } = *add;
                         stack.push(Frame::BinOp1 {
@@ -602,7 +600,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Sub(sub) => {
-                        let callee = scope.get("Core:sub").await?;
+                        let callee = scope.get("Core:sub")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Sub { left, right, .. } = *sub;
                         stack.push(Frame::BinOp1 {
@@ -612,7 +610,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Lt(lt) => {
-                        let callee = scope.get("Core:lt").await?;
+                        let callee = scope.get("Core:lt")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Lt { left, right, .. } = *lt;
                         stack.push(Frame::BinOp1 {
@@ -622,7 +620,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Lteq(lteq) => {
-                        let callee = scope.get("Core:lteq").await?;
+                        let callee = scope.get("Core:lteq")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Lteq { left, right, .. } = *lteq;
                         stack.push(Frame::BinOp1 {
@@ -632,7 +630,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Gt(gt) => {
-                        let callee = scope.get("Core:gt").await?;
+                        let callee = scope.get("Core:gt")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Gt { left, right, .. } = *gt;
                         stack.push(Frame::BinOp1 {
@@ -642,7 +640,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Gteq(gteq) => {
-                        let callee = scope.get("Core:gteq").await?;
+                        let callee = scope.get("Core:gteq")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Gteq { left, right, .. } = *gteq;
                         stack.push(Frame::BinOp1 {
@@ -652,7 +650,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Eq(eq) => {
-                        let callee = scope.get("Core:eq").await?;
+                        let callee = scope.get("Core:eq")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Eq { left, right, .. } = *eq;
                         stack.push(Frame::BinOp1 {
@@ -662,7 +660,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Neq(neq) => {
-                        let callee = scope.get("Core:neq").await?;
+                        let callee = scope.get("Core:neq")?;
                         let callee = <VFn>::try_from(callee)?;
                         let ast::Neq { left, right, .. } = *neq;
                         stack.push(Frame::BinOp1 {
@@ -682,7 +680,7 @@ impl Interpreter {
                         stack.eval(*left);
                     }
                     ast::Expression::Identifier(identifier) => {
-                        let value = scope.get(&identifier.name).await?;
+                        let value = scope.get(&identifier.name)?;
                         value_stack.push(value);
                     }
                     ast::Expression::Call(call) => {
@@ -719,16 +717,14 @@ impl Interpreter {
                 }
                 Frame::Definition2 { dest, value, mut_ } => match dest {
                     ast::Expression::Identifier(identifier) => {
-                        scope
-                            .add(
-                                identifier.name,
-                                if mut_ {
-                                    Variable::Mut(value)
-                                } else {
-                                    Variable::Const(value)
-                                },
-                            )
-                            .await?;
+                        scope.add(
+                            identifier.name,
+                            if mut_ {
+                                Variable::Mut(value)
+                            } else {
+                                Variable::Const(value)
+                            },
+                        )?;
                     }
                     ast::Expression::Arr(arr) => {
                         let value = <Vec<Value>>::try_from(value)?;
@@ -1084,19 +1080,17 @@ impl Interpreter {
                         value_stack.push(value);
                     } else if let Some(op) = op {
                         let v = f64::try_from(value)?;
-                        let target = scope.get(&name).await?;
+                        let target = scope.get(&name)?;
                         let target = f64::try_from(target)?;
-                        scope
-                            .assign(
-                                name,
-                                Value::num(match op {
-                                    AssignmentOperator::Add => target + v,
-                                    AssignmentOperator::Sub => target - v,
-                                }),
-                            )
-                            .await?;
+                        scope.assign(
+                            name,
+                            Value::num(match op {
+                                AssignmentOperator::Add => target + v,
+                                AssignmentOperator::Sub => target - v,
+                            }),
+                        )?;
                     } else {
-                        scope.assign(name, value).await?;
+                        scope.assign(name, value)?;
                     }
                 }
                 Frame::AssignIndex1 { index, expr, op } => {

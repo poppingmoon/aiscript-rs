@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
-
-use futures::{FutureExt, future::BoxFuture};
-use tokio::sync::RwLock;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use crate::error::{AiScriptError, AiScriptRuntimeError};
 
@@ -51,124 +51,119 @@ impl Scope {
         }
     }
 
-    pub async fn get(&self, name: &str) -> Result<Value, AiScriptError> {
-        self.get_(name, self.name()).await
+    pub fn get(&self, name: &str) -> Result<Value, AiScriptError> {
+        self.get_(name, self.name())
     }
 
-    fn get_<'a>(
-        &'a self,
-        name: &'a str,
-        scope_name: &'a str,
-    ) -> BoxFuture<'a, Result<Value, AiScriptError>> {
-        async move {
-            if let Some(Variable::Mut(state) | Variable::Const(state)) =
-                self.states.read().await.get(name)
+    fn get_(&self, name: &str, scope_name: &str) -> Result<Value, AiScriptError> {
+        if let Some(Variable::Mut(state) | Variable::Const(state)) = self
+            .states
+            .read()
+            .map_err(AiScriptError::internal)?
+            .get(name)
+        {
+            Ok(state.clone())
+        } else if let Some(parent) = &self.parent {
+            parent.get_(name, scope_name)
+        } else {
+            Err(AiScriptRuntimeError::runtime(format!(
+                "No such variable '{name}' in scope '{scope_name}'",
+            )))?
+        }
+    }
+
+    pub fn exists(&self, name: &str) -> Result<bool, AiScriptError> {
+        if self
+            .states
+            .read()
+            .map_err(AiScriptError::internal)?
+            .contains_key(name)
+        {
+            Ok(true)
+        } else if let Some(parent) = &self.parent {
+            parent.exists(name)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn get_all(&self) -> Result<HashMap<String, Variable>, AiScriptError> {
+        if let Some(parent) = &self.parent {
+            let mut states = parent.get_all()?;
+            states.extend(
+                self.states
+                    .clone()
+                    .read()
+                    .map_err(AiScriptError::internal)?
+                    .clone(),
+            );
+            Ok(states)
+        } else {
+            self.states
+                .clone()
+                .read()
+                .map_err(AiScriptError::internal)
+                .map(|states| states.clone())
+        }
+    }
+
+    pub fn add(&self, name: &str, variable: Variable) -> Result<(), AiScriptError> {
+        if self
+            .states
+            .read()
+            .map_err(AiScriptError::internal)?
+            .contains_key(name)
+        {
+            Err(AiScriptRuntimeError::runtime(format!(
+                "Variable '{name}' already exists in scope '{}'",
+                self.name()
+            )))?
+        } else {
+            self.states
+                .write()
+                .map_err(AiScriptError::internal)?
+                .insert(name.to_string(), variable.clone());
+            if let Some(parent) = &self.parent
+                && let Some(ns_name) = &self.ns_name
             {
-                Ok(state.clone())
-            } else if let Some(parent) = &self.parent {
-                parent.get_(name, scope_name).await
-            } else {
-                Err(AiScriptRuntimeError::runtime(format!(
-                    "No such variable '{name}' in scope '{scope_name}'",
-                )))?
+                parent.add(&format!("{ns_name}:{name}"), variable)?;
             }
+            Ok(())
         }
-        .boxed()
     }
 
-    pub fn exists<'a>(&'a self, name: &'a str) -> BoxFuture<'a, bool> {
-        async move {
-            if self.states.read().await.contains_key(name) {
-                true
-            } else if let Some(parent) = &self.parent {
-                parent.exists(name).await
-            } else {
-                false
-            }
-        }
-        .boxed()
+    pub fn assign(&self, name: &str, val: Value) -> Result<(), AiScriptError> {
+        self.assign_(name, val, self.name())
     }
 
-    pub fn get_all(&self) -> BoxFuture<'_, HashMap<String, Variable>> {
-        async move {
-            if let Some(parent) = &self.parent {
-                let mut states = parent.get_all().await;
-                states.extend(self.states.clone().read().await.clone());
-                states
-            } else {
-                self.states.clone().read().await.clone()
-            }
-        }
-        .boxed()
-    }
-
-    pub fn add<'a>(
-        &'a self,
-        name: &'a str,
-        variable: Variable,
-    ) -> BoxFuture<'a, Result<(), AiScriptError>> {
-        async move {
-            if self.states.read().await.contains_key(name) {
-                Err(AiScriptRuntimeError::runtime(format!(
-                    "Variable '{name}' already exists in scope '{}'",
-                    self.name()
-                )))?
-            } else {
+    fn assign_(&self, name: &str, val: Value, scope_name: &str) -> Result<(), AiScriptError> {
+        let is_mut = self
+            .states
+            .read()
+            .map_err(AiScriptError::internal)?
+            .get(name)
+            .map(|variable| matches!(variable, Variable::Mut(_)));
+        match is_mut {
+            Some(true) => {
                 self.states
                     .write()
-                    .await
-                    .insert(name.to_string(), variable.clone());
-                if let Some(parent) = &self.parent
-                    && let Some(ns_name) = &self.ns_name
-                {
-                    parent.add(&format!("{ns_name}:{name}"), variable).await?;
-                }
+                    .map_err(AiScriptError::internal)?
+                    .insert(name.to_string(), Variable::Mut(val));
                 Ok(())
             }
-        }
-        .boxed()
-    }
-
-    pub async fn assign(&self, name: &str, val: Value) -> Result<(), AiScriptError> {
-        self.assign_(name, val, self.name()).await
-    }
-
-    fn assign_<'a>(
-        &'a self,
-        name: &'a str,
-        val: Value,
-        scope_name: &'a str,
-    ) -> BoxFuture<'a, Result<(), AiScriptError>> {
-        async move {
-            let is_mut = self
-                .states
-                .read()
-                .await
-                .get(name)
-                .map(|variable| matches!(variable, Variable::Mut(_)));
-            match is_mut {
-                Some(true) => {
-                    self.states
-                        .write()
-                        .await
-                        .insert(name.to_string(), Variable::Mut(val));
-                    Ok(())
-                }
-                Some(false) => Err(AiScriptRuntimeError::runtime(format!(
-                    "Cannot assign to an immutable variable {name}."
-                )))?,
-                None => {
-                    if let Some(parent) = &self.parent {
-                        parent.assign_(name, val, scope_name).await
-                    } else {
-                        Err(AiScriptRuntimeError::runtime(format!(
-                            "No such variable '{name}' in scope '{scope_name}'"
-                        )))?
-                    }
+            Some(false) => Err(AiScriptRuntimeError::runtime(format!(
+                "Cannot assign to an immutable variable {name}."
+            )))?,
+            None => {
+                if let Some(parent) = &self.parent {
+                    parent.assign_(name, val, scope_name)
+                } else {
+                    Err(AiScriptRuntimeError::runtime(format!(
+                        "No such variable '{name}' in scope '{scope_name}'"
+                    )))?
                 }
             }
         }
-        .boxed()
     }
 
     pub fn get_parent(self) -> Result<Scope, AiScriptError> {

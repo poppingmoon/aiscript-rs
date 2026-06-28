@@ -275,7 +275,7 @@ impl Interpreter {
                     } else {
                         let variable =
                             Variable::Const(self.run(vec![definition.expr], &ns_scope).await?);
-                        ns_scope.add(&definition.name, variable).await?;
+                        ns_scope.add(&definition.name, variable)?;
                     }
                 }
             }
@@ -421,7 +421,7 @@ impl Interpreter {
                         stack.run(block.statements);
                     }
                     ast::Expression::Exists(exists) => {
-                        let exists = scope.exists(&exists.identifier.name).await;
+                        let exists = scope.exists(&exists.identifier.name)?;
                         value_stack.push(Value::bool(exists));
                     }
                     ast::Expression::Tmpl(tmpl) => {
@@ -466,7 +466,7 @@ impl Interpreter {
                         stack.eval(*or.left);
                     }
                     ast::Expression::Identifier(identifier) => {
-                        let value = scope.get(&identifier.name).await?;
+                        let value = scope.get(&identifier.name)?;
                         value_stack.push(value);
                     }
                     ast::Expression::Call(call) => {
@@ -485,16 +485,14 @@ impl Interpreter {
                 },
                 Frame::Definition { name, mut_ } => {
                     let value = value_stack.pop_value()?;
-                    scope
-                        .add(
-                            &name,
-                            if mut_ {
-                                Variable::Mut(value)
-                            } else {
-                                Variable::Const(value)
-                            },
-                        )
-                        .await?;
+                    scope.add(
+                        &name,
+                        if mut_ {
+                            Variable::Mut(value)
+                        } else {
+                            Variable::Const(value)
+                        },
+                    )?;
                     value_stack.push(Value::null());
                 }
                 Frame::Return => {
@@ -646,7 +644,7 @@ impl Interpreter {
                 }
                 Frame::Assign2 { dest, value } => match dest {
                     ast::Expression::Identifier(identifier) => {
-                        scope.assign(&identifier.name, value).await?;
+                        scope.assign(&identifier.name, value)?;
                         value_stack.push(Value::null());
                     }
                     ast::Expression::Index(index) => {
