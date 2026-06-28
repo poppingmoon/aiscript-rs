@@ -150,10 +150,7 @@ pub struct Value {
 
 impl Value {
     pub fn new(value: V) -> Self {
-        Value {
-            value,
-            attr: None,
-        }
+        Value { value, attr: None }
     }
 
     pub fn null() -> Self {
