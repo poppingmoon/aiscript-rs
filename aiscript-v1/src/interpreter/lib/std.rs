@@ -315,7 +315,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -338,7 +338,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -361,7 +361,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -384,7 +384,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -407,7 +407,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -430,7 +430,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .and_then(|v| {
                     let date = if let Some(v) = v {
                         chrono::Local
@@ -453,7 +453,7 @@ pub fn std() -> HashMap<String, Value> {
             args.into_iter()
                 .next()
                 .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
+                .transpose()
                 .map(|v| {
                     let v = v.unwrap_or_else(|| chrono::Local::now().timestamp_millis() as f64);
                     Value::num(v % 1000.0)
@@ -608,38 +608,33 @@ pub fn std() -> HashMap<String, Value> {
         "Date:to_iso_str".to_string(),
         Value::fn_native_sync(|args| {
             let mut args = args.into_iter();
-            args.next()
-                .map(f64::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
-                .and_then(|v| {
-                    let date = if let Some(v) = v {
-                        chrono::Local
-                            .timestamp_millis_opt(v as i64)
-                            .earliest()
-                            .ok_or_else(|| {
-                                AiScriptError::internal(format!("invalid timestamp: {v}"))
-                            })?
+            args.next().map(f64::try_from).transpose().and_then(|v| {
+                let date = if let Some(v) = v {
+                    chrono::Local
+                        .timestamp_millis_opt(v as i64)
+                        .earliest()
+                        .ok_or_else(|| AiScriptError::internal(format!("invalid timestamp: {v}")))?
+                } else {
+                    chrono::Local::now()
+                };
+                let mut date = date.fixed_offset();
+                let offset = args
+                    .next()
+                    .map(f64::try_from)
+                    .transpose()?
+                    .and_then(|ofs| chrono::FixedOffset::east_opt((ofs * 60.0) as i32));
+                if let Some(offset) = offset {
+                    date = date.with_timezone(&offset);
+                }
+                Ok(Value::str(
+                    date.format(if date.offset().local_minus_utc() == 0 {
+                        "%Y-%m-%dT%H:%M:%S%.3fZ"
                     } else {
-                        chrono::Local::now()
-                    };
-                    let mut date = date.fixed_offset();
-                    let offset = args
-                        .next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .and_then(|ofs| chrono::FixedOffset::east_opt((ofs * 60.0) as i32));
-                    if let Some(offset) = offset {
-                        date = date.with_timezone(&offset);
-                    }
-                    Ok(Value::str(
-                        date.format(if date.offset().local_minus_utc() == 0 {
-                            "%Y-%m-%dT%H:%M:%S%.3fZ"
-                        } else {
-                            "%Y-%m-%dT%H:%M:%S%.3f%:z"
-                        })
-                        .to_string(),
-                    ))
-                })
+                        "%Y-%m-%dT%H:%M:%S%.3f%:z"
+                    })
+                    .to_string(),
+                ))
+            })
         }),
     );
 
@@ -1336,11 +1331,7 @@ pub fn std() -> HashMap<String, Value> {
                 Ok(callback) => callback,
                 Err(e) => return async { Err(e) }.boxed(),
             };
-            let immediate = match args
-                .next()
-                .map(bool::try_from)
-                .map_or(Ok(None), |r| r.map(Some))
-            {
+            let immediate = match args.next().map(bool::try_from).transpose() {
                 Ok(immediate) => immediate.unwrap_or(false),
                 Err(e) => return async { Err(e) }.boxed(),
             };

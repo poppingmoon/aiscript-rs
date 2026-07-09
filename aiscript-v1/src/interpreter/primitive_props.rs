@@ -115,7 +115,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     let pos = args
                         .next()
                         .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .map(|i| if i < 0.0 { target.len() as f64 + i } else { i });
                     Ok(Value::num(if let Some(pos) = pos {
                         let pos = pos as usize;
@@ -159,11 +159,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 Ok(Value::str(s))
             }),
             "split" => Value::fn_native_sync(move |args| {
-                let splitter = args
-                    .into_iter()
-                    .next()
-                    .map(String::try_from)
-                    .map_or(Ok(None), |r| r.map(Some));
+                let splitter = args.into_iter().next().map(String::try_from).transpose();
                 splitter.map(|splitter| {
                     Value::arr(match splitter {
                         Some(splitter) if !splitter.is_empty() => target
@@ -294,7 +290,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     let pad = args
                         .next()
                         .map(String::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .unwrap_or_else(|| " ".to_string());
                     let target_len = target.graphemes(true).count();
                     let pad_len = pad.graphemes(true).count();
@@ -315,7 +311,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     let pad = args
                         .next()
                         .map(String::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .unwrap_or_else(|| " ".to_string());
                     let target_len = target.graphemes(true).count();
                     let pad_len = pad.graphemes(true).count();
@@ -408,7 +404,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 args.into_iter()
                     .next()
                     .map(String::try_from)
-                    .map_or(Ok(None), |r| r.map(Some))
+                    .transpose()
                     .and_then(|joiner| {
                         let joiner = joiner.unwrap_or_default();
                         Ok(Value::str(
@@ -559,7 +555,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     let from_i = args
                         .next()
                         .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .map_or(0.0, |i| if i < 0.0 { target_len + i } else { i })
                         .clamp(0.0, target_len) as usize;
                     Ok(Value::num(
@@ -684,7 +680,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                         let start = args
                             .next()
                             .map(f64::try_from)
-                            .map_or(Ok(None), |r| r.map(Some))?
+                            .transpose()?
                             .map_or(0, |i| {
                                 if i < 0.0 {
                                     (target_len as f64 + i) as usize
@@ -696,7 +692,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                         let end = args
                             .next()
                             .map(f64::try_from)
-                            .map_or(Ok(None), |r| r.map(Some))?
+                            .transpose()?
                             .map_or(target_len, |i| {
                                 if i < 0.0 {
                                     (target_len as f64 + i) as usize
@@ -742,18 +738,14 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                         idx
                     }
                     .clamp(0.0, target_len as f64) as usize;
-                    let remove_count = args
-                        .next()
-                        .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
-                        .map_or_else(
-                            || target_len - index,
-                            |rc| rc.clamp(0.0, (target_len - index) as f64) as usize,
-                        );
+                    let remove_count = args.next().map(f64::try_from).transpose()?.map_or_else(
+                        || target_len - index,
+                        |rc| rc.clamp(0.0, (target_len - index) as f64) as usize,
+                    );
                     let items = args
                         .next()
                         .map(<Vec<Value>>::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .unwrap_or_default();
                     Ok(Value::arr(
                         target
@@ -791,7 +783,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     args.into_iter()
                         .next()
                         .map(f64::try_from)
-                        .map_or(Ok(None), |r| r.map(Some))
+                        .transpose()
                         .and_then(|depth| {
                             let depth = depth.unwrap_or(1.0);
                             if depth < 0.0 {

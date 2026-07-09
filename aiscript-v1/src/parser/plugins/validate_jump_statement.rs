@@ -164,7 +164,7 @@ impl Visitor for JumpStatementValidator {
                         .visit_expression(expression)
                         .map(ast::StatementOrExpression::Expression),
                 })
-                .map_or(Ok(None), |r| r.map(Some))?
+                .transpose()?
                 .map(Into::into),
             ..if_
         };
@@ -182,7 +182,7 @@ impl Visitor for JumpStatementValidator {
                 let default = param
                     .default
                     .map(|default| self.visit_expression(default))
-                    .map_or(Ok(None), |r| r.map(Some))?;
+                    .transpose()?;
                 self.has_ancestor_function = true;
                 let param = ast::Param {
                     dest: self.visit_expression(param.dest)?,
@@ -190,7 +190,7 @@ impl Visitor for JumpStatementValidator {
                     arg_type: param
                         .arg_type
                         .map(|arg_type| self.visit_type_source(arg_type))
-                        .map_or(Ok(None), |r| r.map(Some))?,
+                        .transpose()?,
                     ..param
                 };
                 self.has_ancestor_function = has_ancestor_function;
@@ -203,7 +203,7 @@ impl Visitor for JumpStatementValidator {
             ret_type: fn_
                 .ret_type
                 .map(|ret_type| self.visit_type_source(ret_type))
-                .map_or(Ok(None), |r| r.map(Some))?,
+                .transpose()?,
             children: fn_
                 .children
                 .into_iter()
@@ -267,7 +267,7 @@ impl Visitor for JumpStatementValidator {
                         .visit_expression(expression)
                         .map(ast::StatementOrExpression::Expression),
                 })
-                .map_or(Ok(None), |r| r.map(Some))?
+                .transpose()?
                 .map(Into::into),
             ..match_
         };

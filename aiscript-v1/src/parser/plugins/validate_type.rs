@@ -45,11 +45,11 @@ impl Visitor for TypeValidator {
                             default: param
                                 .default
                                 .map(|default| self.visit_expression(default))
-                                .map_or(Ok(None), |r| r.map(Some))?,
+                                .transpose()?,
                             arg_type: param
                                 .arg_type
                                 .map(|arg_type| self.visit_type_source(arg_type))
-                                .map_or(Ok(None), |r| r.map(Some))?,
+                                .transpose()?,
                             ..param
                         })
                     })
@@ -57,7 +57,7 @@ impl Visitor for TypeValidator {
                 ret_type: fn_
                     .ret_type
                     .map(|ret_type| self.visit_type_source(ret_type))
-                    .map_or(Ok(None), |r| r.map(Some))?,
+                    .transpose()?,
                 children: fn_
                     .children
                     .into_iter()
@@ -104,11 +104,11 @@ impl Visitor for FnTypeValidator {
                         default: param
                             .default
                             .map(|default| self.visit_expression(default))
-                            .map_or(Ok(None), |r| r.map(Some))?,
+                            .transpose()?,
                         arg_type: param
                             .arg_type
                             .map(|arg_type| self.visit_type_source(arg_type))
-                            .map_or(Ok(None), |r| r.map(Some))?,
+                            .transpose()?,
                         ..param
                     })
                 })
@@ -116,7 +116,7 @@ impl Visitor for FnTypeValidator {
             ret_type: fn_
                 .ret_type
                 .map(|ret_type| self.visit_type_source(ret_type))
-                .map_or(Ok(None), |r| r.map(Some))?,
+                .transpose()?,
             children: fn_
                 .children
                 .into_iter()

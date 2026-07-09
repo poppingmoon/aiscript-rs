@@ -202,7 +202,7 @@ impl Visitor for KeywordValidator {
                             })
                             .collect::<Result<Vec<ast::TypeParam>, AiScriptSyntaxError>>()
                     })
-                    .map_or(Ok(None), |r| r.map(Some))?;
+                    .transpose()?;
                 let params = fn_
                     .params
                     .into_iter()
@@ -258,7 +258,7 @@ impl Visitor for KeywordValidator {
                             })
                             .collect::<Result<Vec<ast::TypeParam>, AiScriptSyntaxError>>()
                     })
-                    .map_or(Ok(None), |r| r.map(Some))?;
+                    .transpose()?;
                 Ok(ast::TypeSource::FnTypeSource(ast::FnTypeSource {
                     type_params,
                     ..fn_type_source

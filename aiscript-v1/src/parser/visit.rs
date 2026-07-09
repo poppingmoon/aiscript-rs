@@ -79,7 +79,7 @@ pub trait Visitor {
                         expr: break_
                             .expr
                             .map(|expr| self.visit_expression(expr))
-                            .map_or(Ok(None), |r| r.map(Some))?,
+                            .transpose()?,
                         ..break_
                     }
                     .into(),
@@ -131,7 +131,7 @@ pub trait Visitor {
             var_type: definition
                 .var_type
                 .map(|var_type| self.visit_type_source(var_type))
-                .map_or(Ok(None), |r| r.map(Some))?,
+                .transpose()?,
             expr: self.visit_expression(definition.expr)?,
             attr: definition
                 .attr
@@ -140,7 +140,7 @@ pub trait Visitor {
                         .map(|attr| self.visit_attribute(attr))
                         .collect::<Result<Vec<ast::Attribute>, AiScriptSyntaxError>>()
                 })
-                .map_or(Ok(None), |r| r.map(Some))?,
+                .transpose()?,
             ..definition
         })
     }
@@ -545,7 +545,7 @@ pub trait Visitor {
                         .visit_expression(expression)
                         .map(ast::StatementOrExpression::Expression),
                 })
-                .map_or(Ok(None), |r| r.map(Some))?
+                .transpose()?
                 .map(Into::into),
             ..if_
         })
@@ -562,11 +562,11 @@ pub trait Visitor {
                         default: param
                             .default
                             .map(|default| self.visit_expression(default))
-                            .map_or(Ok(None), |r| r.map(Some))?,
+                            .transpose()?,
                         arg_type: param
                             .arg_type
                             .map(|arg_type| self.visit_type_source(arg_type))
-                            .map_or(Ok(None), |r| r.map(Some))?,
+                            .transpose()?,
                         ..param
                     })
                 })
@@ -574,7 +574,7 @@ pub trait Visitor {
             ret_type: fn_
                 .ret_type
                 .map(|ret_type| self.visit_type_source(ret_type))
-                .map_or(Ok(None), |r| r.map(Some))?,
+                .transpose()?,
             children: fn_
                 .children
                 .into_iter()
@@ -621,7 +621,7 @@ pub trait Visitor {
                         .visit_expression(expression)
                         .map(ast::StatementOrExpression::Expression),
                 })
-                .map_or(Ok(None), |r| r.map(Some))?
+                .transpose()?
                 .map(Into::into),
             ..match_
         })
@@ -663,7 +663,7 @@ pub trait Visitor {
                     inner: named_type_source
                         .inner
                         .map(|inner| self.visit_type_source(*inner))
-                        .map_or(Ok(None), |r| r.map(Some))?
+                        .transpose()?
                         .map(Into::into),
                     ..named_type_source
                 })
