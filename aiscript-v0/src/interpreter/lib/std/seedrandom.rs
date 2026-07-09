@@ -79,10 +79,10 @@ impl Arc4 {
 fn mixkey(seed: &str) -> Vec<u8> {
     let mut key = Vec::new();
     let mut smear = 0_u32;
-    for (j, c) in seed.chars().enumerate() {
+    for (j, c) in seed.encode_utf16().enumerate() {
         let i = j as u8;
         smear ^= key.get(i as usize).map_or(0, |i| *i as u32) * 19;
-        let value = (smear + c as u32) as u8;
+        let value = (smear + c as u8 as u32) as u8;
         if j <= u8::MAX as usize {
             key.push(value)
         } else {
