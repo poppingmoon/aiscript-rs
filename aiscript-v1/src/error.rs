@@ -99,6 +99,8 @@ pub enum AiScriptRuntimeError {
     ExpectAny,
     #[error("Index out of range. index: {index} max: {max}")]
     IndexOutOfRange { index: f64, max: isize },
+    #[error("`options.algorithm` must be one of these: `chacha20`, `rc4`, or `rc4_legacy`.")]
+    InvalidAlgorithm,
     #[error(
         "The left-hand side of an assignment expression must be a variable or a property/index \
         access."

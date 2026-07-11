@@ -7,6 +7,7 @@ use std::{
 use chrono::{Datelike, TimeZone, Timelike};
 use futures::FutureExt;
 use indexmap::IndexMap;
+use sha2::{Digest, Sha384};
 
 use crate::{
     constants::AISCRIPT_VERSION,
@@ -18,11 +19,15 @@ use crate::{
 };
 
 use self::{
-    seedrandom::seedrandom,
+    random::{
+        Rng,
+        chacha20::ChaCha20Rng,
+        seedrandom::{SeedrandomRng, seedrandom},
+    },
     uri_encoding::{decode_uri, decode_uri_component, encode_uri, encode_uri_component},
 };
 
-mod seedrandom;
+mod random;
 mod uri_encoding;
 
 pub fn std() -> HashMap<String, Value> {
@@ -983,30 +988,99 @@ pub fn std() -> HashMap<String, Value> {
     std.insert(
         "Math:gen_rng".to_string(),
         Value::fn_native_sync(|args| {
-            let seed = expect_any(args.into_iter().next())?;
-            let seed = match seed.value {
-                V::Num(num) => num.to_string(),
-                V::Str(str) => str,
-                _ => Err(AiScriptRuntimeError::InvalidSeed)?,
-            };
-            let rng = Arc::new(Mutex::new(seedrandom(seed)));
-            Ok(Value::fn_native_sync(move |args| {
-                rng.lock()
-                    .map_err(AiScriptError::internal)
-                    .map(|mut rng| rng())
-                    .map(|r| {
+            let mut args = args.into_iter();
+            let seed = expect_any(args.next())?;
+            let mut options = args
+                .next()
+                .map(<IndexMap<String, Value>>::try_from)
+                .transpose()?;
+            let algo = options
+                .as_mut()
+                .and_then(|options| options.swap_remove("algorithm").map(String::try_from))
+                .transpose()?;
+            match algo.as_deref() {
+                Some("rc4_legacy") => {
+                    let seed = match seed.value {
+                        V::Num(num) => num.to_string(),
+                        V::Str(str) => str,
+                        _ => Err(AiScriptRuntimeError::InvalidSeed)?,
+                    };
+                    let rng = Arc::new(Mutex::new(seedrandom(seed)));
+                    Ok(Value::fn_native_sync(move |args| {
                         let mut args = args.into_iter();
                         let min = args.next().and_then(|arg| f64::try_from(arg).ok());
                         let max = args.next().and_then(|arg| f64::try_from(arg).ok());
-                        Value::num(if let (Some(min), Some(max)) = (min, max) {
-                            let max = max.floor();
-                            let min = min.ceil();
-                            (r * (max - min + 1.0)).floor() + min
-                        } else {
-                            r
+                        rng.lock()
+                            .map_err(AiScriptError::internal)
+                            .map(|mut rng| rng())
+                            .map(|r| {
+                                Value::num(if let (Some(min), Some(max)) = (min, max) {
+                                    let max = max.floor();
+                                    let min = min.ceil();
+                                    (r * (max - min + 1.0)).floor() + min
+                                } else {
+                                    r
+                                })
+                            })
+                    }))
+                }
+                Some("rc4") => {
+                    let seed = match seed.value {
+                        V::Num(num) => num.to_string(),
+                        V::Str(str) => str,
+                        _ => Err(AiScriptRuntimeError::InvalidSeed)?,
+                    };
+                    let rng = Arc::new(Mutex::new(SeedrandomRng::new(&seed)));
+                    Ok(Value::fn_native_sync(move |args| {
+                        let mut args = args.into_iter();
+                        let min = args.next().and_then(|arg| f64::try_from(arg).ok());
+                        let max = args.next().and_then(|arg| f64::try_from(arg).ok());
+                        rng.lock().map_err(AiScriptError::internal).map(|mut rng| {
+                            if let (Some(min), Some(max)) = (min, max) {
+                                rng.generate_random_integer_in_range(min, max)
+                                    .map(|i| Value::num(i as f64))
+                                    .unwrap_or_default()
+                            } else {
+                                Value::num(rng.generate_number_0_to_1())
+                            }
                         })
-                    })
-            }))
+                    }))
+                }
+                Some("chacha20") | None => {
+                    let seed = match seed.value {
+                        V::Num(num) => {
+                            let number_as_integer_option_value = options.and_then(|mut options| {
+                                options
+                                    .swap_remove("chacha20_number_seed_legacy_behavior")
+                                    .and_then(|value| bool::try_from(value).ok())
+                            });
+                            if let Some(true) = number_as_integer_option_value {
+                                Sha384::digest([num as u8])
+                            } else {
+                                Sha384::digest(num.to_le_bytes())
+                            }
+                        }
+                        V::Str(str) => Sha384::digest(str),
+                        _ => Err(AiScriptRuntimeError::InvalidSeed)?,
+                    };
+                    let rng = Arc::new(Mutex::new(ChaCha20Rng::new(seed.as_ref())));
+                    Ok(Value::fn_native_sync(move |args| {
+                        let mut args = args.into_iter();
+                        let min = args.next().and_then(|arg| f64::try_from(arg).ok());
+                        let max = args.next().and_then(|arg| f64::try_from(arg).ok());
+                        rng.lock().map_err(AiScriptError::internal).map(|mut rng| {
+                            if let (Some(min), Some(max)) = (min, max) {
+                                rng.generate_random_integer_in_range(min, max)
+                                    .map(|i| Value::num(i as f64))
+                                    .unwrap_or_default()
+                            } else {
+                                Value::num(rng.generate_number_0_to_1())
+                            }
+                        })
+                    }))
+                }
+                _ => Err(AiScriptRuntimeError::InvalidAlgorithm)?,
+            }
         }),
     );
 

@@ -1,3 +1,27 @@
+use super::Rng;
+
+#[derive(Debug)]
+pub struct SeedrandomRng {
+    arc4: Arc4,
+}
+
+impl SeedrandomRng {
+    pub fn new(seed: &str) -> Self {
+        let key = mixkey(seed);
+        let arc4 = Arc4::new(key);
+        SeedrandomRng { arc4 }
+    }
+}
+
+impl Rng for SeedrandomRng {
+    fn generate_int_by_bytes(&mut self, bytes: u8) -> u64 {
+        let v = self.arc4.g(bytes.into());
+        let mut bytes = [0_u8; 8];
+        bytes[..v.len()].copy_from_slice(&v);
+        u64::from_le_bytes(bytes)
+    }
+}
+
 // https://github.com/davidbau/seedrandom
 
 const WIDTH: usize = u8::MAX as usize + 1; // each RC4 output is 0 <= x < 256
