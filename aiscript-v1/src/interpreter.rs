@@ -466,13 +466,7 @@ impl Interpreter {
                         .await?;
                         value_stack.push(
                             if let Some(control) = params.iter().find_map(|param| {
-                                param.default.as_ref().and_then(|value| {
-                                    if value.is_control() {
-                                        Some(value)
-                                    } else {
-                                        None
-                                    }
-                                })
+                                param.default.as_ref().filter(|&value| value.is_control())
                             }) {
                                 control.clone()
                             } else {
