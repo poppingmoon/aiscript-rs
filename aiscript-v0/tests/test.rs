@@ -4487,9 +4487,9 @@ mod primitive_props {
             test(
                 r#"
                 var arr = [2, 10, 3]
-				let comp = @(a, b) { a - b }
-				arr.sort(comp)
-				<: arr
+                let comp = @(a, b) { a - b }
+                arr.sort(comp)
+                <: arr
                 "#,
                 |res| assert_eq!(res, arr([num(2), num(3), num(10)])),
             )
@@ -4502,8 +4502,8 @@ mod primitive_props {
             test(
                 r#"
                 var arr = ["hoge", "huga", "piyo", "hoge"]
-				arr.sort(Str:lt)
-				<: arr
+                arr.sort(Str:lt)
+                <: arr
                 "#,
                 |res| {
                     assert_eq!(
@@ -4521,8 +4521,8 @@ mod primitive_props {
             test(
                 r#"
                 var arr = ["hoge", "huga", "piyo", "hoge"]
-				arr.sort(Str:gt)
-				<: arr
+                arr.sort(Str:gt)
+                <: arr
                 "#,
                 |res| {
                     assert_eq!(
@@ -4540,10 +4540,10 @@ mod primitive_props {
             test(
                 r#"
                 var arr = [{x: 2}, {x: 10}, {x: 3}]
-				let comp = @(a, b) { a.x - b.x }
+                let comp = @(a, b) { a.x - b.x }
 
-				arr.sort(comp)
-				<: arr
+                arr.sort(comp)
+                <: arr
                 "#,
                 |res| {
                     assert_eq!(
@@ -4565,11 +4565,11 @@ mod primitive_props {
             test(
                 r#"
                 var arr1 = [0, 1, 2]
-				let arr2 = arr1.fill(3)
-				let arr3 = [0, 1, 2].fill(3, 1)
-				let arr4 = [0, 1, 2].fill(3, 1, 2)
-				let arr5 = [0, 1, 2].fill(3, -2, -1)
-				<: [arr1, arr2, arr3, arr4, arr5]
+                let arr2 = arr1.fill(3)
+                let arr3 = [0, 1, 2].fill(3, 1)
+                let arr4 = [0, 1, 2].fill(3, 1, 2)
+                let arr5 = [0, 1, 2].fill(3, -2, -1)
+                <: [arr1, arr2, arr3, arr4, arr5]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4593,9 +4593,9 @@ mod primitive_props {
             test(
                 r#"
                 var arr1 = [0, 1, 2]
-				let arr2 = arr1.repeat(3)
-				let arr3 = arr1.repeat(0)
-				<: [arr1, arr2, arr3]
+                let arr2 = arr1.repeat(3)
+                let arr3 = arr1.repeat(0)
+                <: [arr1, arr2, arr3]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4627,8 +4627,8 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let arr2 = arr1.splice(1, 2, [10])
-				<: [arr1, arr2]
+                let arr2 = arr1.splice(1, 2, [10])
+                <: [arr1, arr2]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4646,8 +4646,8 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let arr2 = arr1.splice(-1, 0, [10, 20])
-				<: [arr1, arr2]
+                let arr2 = arr1.splice(-1, 0, [10, 20])
+                <: [arr1, arr2]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4668,8 +4668,8 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let arr2 = arr1.splice(4, 100, [10, 20])
-				<: [arr1, arr2]
+                let arr2 = arr1.splice(4, 100, [10, 20])
+                <: [arr1, arr2]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4690,8 +4690,8 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let arr2 = arr1.splice(1)
-				<: [arr1, arr2]
+                let arr2 = arr1.splice(1)
+                <: [arr1, arr2]
                 "#,
                 |res| assert_eq!(res, arr([arr([num(0)]), arr([num(1), num(2), num(3)]),])),
             )
@@ -4704,9 +4704,9 @@ mod primitive_props {
             test(
                 r#"
                 var arr1 = [0, [1], [2, 3], [4, [5, 6]]]
-				let arr2 = arr1.flat()
-				let arr3 = arr1.flat(2)
-				<: [arr1, arr2, arr3]
+                let arr2 = arr1.flat()
+                let arr3 = arr1.flat(2)
+                <: [arr1, arr2, arr3]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4740,9 +4740,9 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2]
-				let arr2 = ["a", "b"]
-				let arr3 = arr1.flat_map(@(x){ arr2.map(@(y){ [x, y] }) })
-				<: [arr1, arr3]
+                let arr2 = ["a", "b"]
+                let arr3 = arr1.flat_map(@(x){ arr2.map(@(y){ [x, y] }) })
+                <: [arr1, arr3]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4770,10 +4770,10 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let res1 = arr1.every(@(v,i){v==0 || i > 0})
-				let res2 = arr1.every(@(v,i){v==0 && i > 0})
-				let res3 = [].every(@(v,i){false})
-				<: [arr1, res1, res2, res3]
+                let res1 = arr1.every(@(v,i){v==0 || i > 0})
+                let res2 = arr1.every(@(v,i){v==0 && i > 0})
+                let res3 = [].every(@(v,i){false})
+                <: [arr1, res1, res2, res3]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4796,9 +4796,9 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3]
-				let res1 = arr1.some(@(v,i){v%2==0 && i <= 2})
-				let res2 = arr1.some(@(v,i){v%2==0 && i > 2})
-				<: [arr1, res1, res2]
+                let res1 = arr1.some(@(v,i){v%2==0 && i <= 2})
+                let res2 = arr1.some(@(v,i){v%2==0 && i > 2})
+                <: [arr1, res1, res2]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4820,15 +4820,15 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2]
-				let res = []
-				res.push(arr1.insert(3, 10)) // [0, 1, 2, 10]
-				res.push(arr1.insert(2, 20)) // [0, 1, 20, 2, 10]
-				res.push(arr1.insert(0, 30)) // [30, 0, 1, 20, 2, 10]
-				res.push(arr1.insert(-1, 40)) // [30, 0, 1, 20, 2, 40, 10]
-				res.push(arr1.insert(-4, 50)) // [30, 0, 1, 50, 20, 2, 40, 10]
-				res.push(arr1.insert(100, 60)) // [30, 0, 1, 50, 20, 2, 40, 10, 60]
-				res.push(arr1)
-				<: res
+                let res = []
+                res.push(arr1.insert(3, 10)) // [0, 1, 2, 10]
+                res.push(arr1.insert(2, 20)) // [0, 1, 20, 2, 10]
+                res.push(arr1.insert(0, 30)) // [30, 0, 1, 20, 2, 10]
+                res.push(arr1.insert(-1, 40)) // [30, 0, 1, 20, 2, 40, 10]
+                res.push(arr1.insert(-4, 50)) // [30, 0, 1, 50, 20, 2, 40, 10]
+                res.push(arr1.insert(100, 60)) // [30, 0, 1, 50, 20, 2, 40, 10, 60]
+                res.push(arr1)
+                <: res
                 "#,
                 |res| {
                     assert_eq!(
@@ -4864,15 +4864,15 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-				let res = []
-				res.push(arr1.remove(9)) // 9 [0, 1, 2, 3, 4, 5, 6, 7, 8]
-				res.push(arr1.remove(3)) // 3 [0, 1, 2, 4, 5, 6, 7, 8]
-				res.push(arr1.remove(0)) // 0 [1, 2, 4, 5, 6, 7, 8]
-				res.push(arr1.remove(-1)) // 8 [1, 2, 4, 5, 6, 7]
-				res.push(arr1.remove(-5)) // 2 [1, 4, 5, 6, 7]
-				res.push(arr1.remove(100)) // null [1, 4, 5, 6, 7]
-				res.push(arr1)
-				<: res
+                let res = []
+                res.push(arr1.remove(9)) // 9 [0, 1, 2, 3, 4, 5, 6, 7, 8]
+                res.push(arr1.remove(3)) // 3 [0, 1, 2, 4, 5, 6, 7, 8]
+                res.push(arr1.remove(0)) // 0 [1, 2, 4, 5, 6, 7, 8]
+                res.push(arr1.remove(-1)) // 8 [1, 2, 4, 5, 6, 7]
+                res.push(arr1.remove(-5)) // 2 [1, 4, 5, 6, 7]
+                res.push(arr1.remove(100)) // null [1, 4, 5, 6, 7]
+                res.push(arr1)
+                <: res
                 "#,
                 |res| {
                     assert_eq!(
@@ -4898,13 +4898,13 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [10, 20, 30]
-				<: [
-					arr1
-					arr1.at(0), arr1.at(1), arr1.at(2)
-					arr1.at(-3), arr1.at(-2), arr1.at(-1)
-					arr1.at(3), arr1.at(4), arr1.at(5)
-					arr1.at(-6), arr1.at(-5), arr1.at(-4)
-				]
+                <: [
+                    arr1
+                    arr1.at(0), arr1.at(1), arr1.at(2)
+                    arr1.at(-3), arr1.at(-2), arr1.at(-1)
+                    arr1.at(3), arr1.at(4), arr1.at(5)
+                    arr1.at(-6), arr1.at(-5), arr1.at(-4)
+                ]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4936,13 +4936,13 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [10, 20, 30]
-				<: [
-					arr1
-					arr1.at(0, 100), arr1.at(1, 100), arr1.at(2, 100)
-					arr1.at(-3, 100), arr1.at(-2, 100), arr1.at(-1, 100)
-					arr1.at(3, 100), arr1.at(4, 100), arr1.at(5, 100)
-					arr1.at(-6, 100), arr1.at(-5, 100), arr1.at(-4, 100)
-				]
+                <: [
+                    arr1
+                    arr1.at(0, 100), arr1.at(1, 100), arr1.at(2, 100)
+                    arr1.at(-3, 100), arr1.at(-2, 100), arr1.at(-1, 100)
+                    arr1.at(3, 100), arr1.at(4, 100), arr1.at(5, 100)
+                    arr1.at(-6, 100), arr1.at(-5, 100), arr1.at(-4, 100)
+                ]
                 "#,
                 |res| {
                     assert_eq!(
@@ -4974,13 +4974,13 @@ mod primitive_props {
             test(
                 r#"
                 let arr1 = [10, 20, 30]
-				<: [
-					arr1
-					arr1.at(0.1), arr1.at(1.4), arr1.at(2.5)
-					arr1.at(-3.1), arr1.at(-2.4), arr1.at(-1.5)
-					arr1.at(3.1), arr1.at(4.4), arr1.at(5.5)
-					arr1.at(-6.1), arr1.at(-5.4), arr1.at(-4.5)
-				]
+                <: [
+                    arr1
+                    arr1.at(0.1), arr1.at(1.4), arr1.at(2.5)
+                    arr1.at(-3.1), arr1.at(-2.4), arr1.at(-1.5)
+                    arr1.at(3.1), arr1.at(4.4), arr1.at(5.5)
+                    arr1.at(-6.1), arr1.at(-5.4), arr1.at(-4.5)
+                ]
                 "#,
                 |res| {
                     assert_eq!(
@@ -5099,8 +5099,8 @@ mod std {
             test(
                 r#"
                 let arr = []
-				arr.push(arr)
-				<: Core:to_str(arr)
+                arr.push(arr)
+                <: Core:to_str(arr)
                 "#,
                 |res| assert_eq!(res, str("[ ... ]")),
             )
@@ -5110,8 +5110,8 @@ mod std {
             test(
                 r#"
                 let arr = []
-				arr.push({ value: arr })
-				<: Core:to_str(arr)
+                arr.push({ value: arr })
+                <: Core:to_str(arr)
                 "#,
                 |res| assert_eq!(res, str("[ { value: ... } ]")),
             )
@@ -5399,7 +5399,7 @@ mod std {
             test(
                 r#"
                 <: Str:from_unicode_codepoints([171581, 128073, 127999, 128104, 8205, 128102])
-			    "#,
+                "#,
                 |res| assert_eq!(res, str("𩸽👉🏿👨‍👦")),
             )
             .await
@@ -5825,9 +5825,9 @@ mod std {
             test(
                 r#"
                 let d1 = Date:parse("2024-04-12T01:47:46.021+09:00")
-				let s1 = Date:to_iso_str(d1)
-				let d2 = Date:parse(s1)
-				<: [d1, d2, s1]
+                let s1 = Date:to_iso_str(d1)
+                let d2 = Date:parse(s1)
+                <: [d1, d2, s1]
                 "#,
                 |res| {
                     let res = <Vec<Value>>::try_from(res).unwrap();
@@ -5853,9 +5853,9 @@ mod std {
             test(
                 r#"
                 let d1 = Date:parse("2024-04-12T01:47:46.021+09:00")
-				let s1 = Date:to_iso_str(d1, 0)
-				let d2 = Date:parse(s1)
-				<: [d1, d2, s1]
+                let s1 = Date:to_iso_str(d1, 0)
+                let d2 = Date:parse(s1)
+                <: [d1, d2, s1]
                 "#,
                 |res| {
                     assert_eq!(
@@ -5877,9 +5877,9 @@ mod std {
             test(
                 r#"
                 let d1 = Date:parse("2024-04-12T01:47:46.021+09:00")
-				let s1 = Date:to_iso_str(d1, 9*60)
-				let d2 = Date:parse(s1)
-				<: [d1, d2, s1]
+                let s1 = Date:to_iso_str(d1, 9*60)
+                let d2 = Date:parse(s1)
+                <: [d1, d2, s1]
                 "#,
                 |res| {
                     assert_eq!(
@@ -5901,9 +5901,9 @@ mod std {
             test(
                 r#"
                 let d1 = Date:parse("2024-04-12T01:47:46.021+09:00")
-				let s1 = Date:to_iso_str(d1, -5*60-18)
-				let d2 = Date:parse(s1)
-				<: [d1, d2, s1]
+                let s1 = Date:to_iso_str(d1, -5*60-18)
+                let d2 = Date:parse(s1)
+                <: [d1, d2, s1]
                 "#,
                 |res| {
                     assert_eq!(

@@ -930,7 +930,7 @@ mod function_call {
         let err = test(
             r#"
             @func(a){}
-			func()
+            func()
             "#,
             |_| {},
         )

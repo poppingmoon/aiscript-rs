@@ -1206,10 +1206,10 @@ mod arr {
         test(
             r#"
             var arr = [[2, 0], [10, 1], [3, 2], [3, 3], [2, 4]]
-			let comp = @(a, b) { a[0] - b[0] }
+            let comp = @(a, b) { a[0] - b[0] }
 
-			arr.sort(comp)
-			<: arr
+            arr.sort(comp)
+            <: arr
             "#,
             |res| {
                 assert_eq!(

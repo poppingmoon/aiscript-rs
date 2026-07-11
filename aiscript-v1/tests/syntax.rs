@@ -282,7 +282,7 @@ mod separator {
             let err = test(
                 r#"
                 let x = 1
-				<:match x{case 1=>"a" case 2=>"b"}
+                <:match x{case 1=>"a" case 2=>"b"}
                 "#,
                 |_| {},
             )
@@ -302,7 +302,7 @@ mod separator {
             let err = test(
                 r#"
                 let x = 1
-				<:match x{case 1=>"a" default=>"b"}
+                <:match x{case 1=>"a" default=>"b"}
                 "#,
                 |_| {},
             )
@@ -923,8 +923,8 @@ mod cannot_put_multiple_statements_in_a_line {
         let err = test(
             r#"
             eval {
-				let a = 42 let b = 11
-			}
+                let a = 42 let b = 11
+            }
             "#,
             |_| {},
         )
@@ -979,7 +979,7 @@ mod variable_declaration {
         test(
             r#"
             @hoge() { }
-			<: hoge()
+            <: hoge()
             "#,
             |res| assert_eq!(res, null()),
         )
@@ -1218,8 +1218,8 @@ mod each {
         test(
             r#"
             each let { value: a }, [{ value: 1 }] {
-				<: a
-			}
+                <: a
+            }
             "#,
             |res| assert_eq!(res, num(1)),
         )
@@ -1783,8 +1783,8 @@ mod namespace {
         let err = test(
             r#"
             :: Foo {
-				let [a, b] = [1, 2]
-			}
+                let [a, b] = [1, 2]
+            }
             "#,
             |_| {},
         )
@@ -1873,9 +1873,9 @@ mod operators {
         test(
             r#"
             let f = @(){}
-			let g = f
+            let g = f
 
-			<: (f == g)
+            <: (f == g)
             "#,
             |res| assert_eq!(res, bool(true)),
         )
