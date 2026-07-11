@@ -1,21 +1,29 @@
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
+
 use aiscript_v1::{Interpreter, Parser, errors::AiScriptError, values::Value};
-use futures::FutureExt;
 use indexmap::IndexMap;
 
 #[allow(dead_code)]
 pub async fn test(program: &str, test: fn(Value)) -> Result<Value, AiScriptError> {
     let ast = Parser::default().parse(program)?;
-    let aiscript = Interpreter::new(
-        [],
-        None::<fn(_) -> _>,
-        Some(move |value| {
+    let test_count = Arc::new(AtomicUsize::new(0));
+    let test_count_clone = test_count.clone();
+    let aiscript = Interpreter::builder()
+        .out_sync(move |value| {
             test(value);
-            async move {}.boxed()
-        }),
-        None::<fn(_) -> _>,
-        Some(9999),
-    );
-    aiscript.exec(ast).await.map(|value| value.unwrap())
+            test_count_clone.fetch_add(1, Ordering::Relaxed);
+        })
+        .max_step(9999)
+        .build();
+    let result = aiscript.exec(ast).await.map(|value| value.unwrap())?;
+    match test_count.load(Ordering::Relaxed) {
+        0 => panic!("test has never been called"),
+        1 => Ok(result),
+        count => panic!("test has been called ${count} times"),
+    }
 }
 
 #[allow(dead_code)]

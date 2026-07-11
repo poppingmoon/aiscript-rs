@@ -1324,8 +1324,9 @@ mod while_ {
             while false {
                 <: 'hoge'
             }
+            <: 42
             "#,
-            |_| panic!(),
+            |res| assert_eq!(res, num(42)),
         )
         .await
         .unwrap();

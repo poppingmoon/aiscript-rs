@@ -373,7 +373,7 @@ mod empty_lines {
         async fn empty_line_after() {
             test(
                 r#"
-                ! \
+                <: ! \
                 // comment
                 true
                 "#,
