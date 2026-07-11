@@ -1063,7 +1063,7 @@ pub fn std() -> HashMap<String, Value> {
                         V::Str(str) => Sha384::digest(str),
                         _ => Err(AiScriptRuntimeError::InvalidSeed)?,
                     };
-                    let rng = Arc::new(Mutex::new(ChaCha20Rng::new(seed.as_ref())));
+                    let rng = Arc::new(Mutex::new(ChaCha20Rng::new(&seed)));
                     Ok(Value::fn_native_sync(move |args| {
                         let mut args = args.into_iter();
                         let min = args.next().and_then(|arg| f64::try_from(arg).ok());
