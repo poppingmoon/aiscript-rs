@@ -30,9 +30,7 @@ const URI_ESCAPE: &AsciiSet = &URI_COMPONENT_ESCAPE
     .remove(b',')
     .remove(b'#');
 
-const PRESERVE_ESCAPE_SET: [u8; 11] = [
-    b';', b'/', b'?', b':', b'@', b'&', b'=', b'+', b'$', b',', b'#',
-];
+const PRESERVE_ESCAPE_SET: [u8; 11] = *b";/?:@&=+$,#";
 
 pub fn encode_uri(input: &str) -> String {
     utf8_percent_encode(input, URI_ESCAPE).to_string()
