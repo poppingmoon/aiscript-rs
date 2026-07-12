@@ -1111,7 +1111,7 @@ fn parse_object(
             _ => {}
         }
 
-        let (k, pos) = parse_object_key(s)?;
+        let (k, pos, is_identifier_key) = parse_object_key(s)?;
 
         match map.entry(k) {
             Entry::Occupied(entry) => Err(AiScriptSyntaxError {
@@ -1119,23 +1119,54 @@ fn parse_object(
                 pos,
             })?,
             Entry::Vacant(entry) => {
-                match s.pop_token() {
-                    Token::Colon { .. } => {}
-                    Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
-                        kind: AiScriptSyntaxErrorKind::UnexpectedEof,
-                        pos,
-                    })?,
-                    token => Err(AiScriptSyntaxError {
-                        kind: AiScriptSyntaxErrorKind::UnexpectedToken(token.kind().to_string()),
-                        pos: token.into_pos(),
-                    })?,
-                };
-
                 let v = if is_static {
-                    parse_static_expr
+                    match s.pop_token() {
+                        Token::Colon { .. } => {}
+                        Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
+                            kind: AiScriptSyntaxErrorKind::UnexpectedEof,
+                            pos,
+                        })?,
+                        token => Err(AiScriptSyntaxError {
+                            kind: AiScriptSyntaxErrorKind::UnexpectedToken(
+                                token.kind().to_string(),
+                            ),
+                            pos: token.into_pos(),
+                        })?,
+                    };
+                    parse_static_expr(s)?
+                } else if !is_identifier_key {
+                    match s.pop_token() {
+                        Token::Colon { .. } => {}
+                        Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
+                            kind: AiScriptSyntaxErrorKind::UnexpectedEof,
+                            pos,
+                        })?,
+                        token => Err(AiScriptSyntaxError {
+                            kind: AiScriptSyntaxErrorKind::UnexpectedToken(
+                                token.kind().to_string(),
+                            ),
+                            pos: token.into_pos(),
+                        })?,
+                    };
+                    parse_expr(s)?
                 } else {
-                    parse_expr
-                }(s)?;
+                    match s.peek() {
+                        Token::Colon { .. } => {
+                            s.pop_token();
+                            parse_expr(s)?
+                        }
+                        token => ast::Expression::Identifier(
+                            ast::Identifier {
+                                name: entry.key().to_string(),
+                                loc: ast::Loc {
+                                    start: pos,
+                                    end: token.pos().clone(),
+                                },
+                            }
+                            .into(),
+                        ),
+                    }
+                };
 
                 entry.insert(v);
             }
@@ -1164,31 +1195,31 @@ fn parse_object(
     })
 }
 
-fn parse_object_key(s: &mut Tokens) -> Result<(String, ast::Pos), AiScriptSyntaxError> {
+fn parse_object_key(s: &mut Tokens) -> Result<(String, ast::Pos, bool), AiScriptSyntaxError> {
     Ok(match s.pop_token() {
-        Token::Identifier { pos, value, .. } => (value.to_string(), pos),
-        Token::StringLiteral { pos, value, .. } => (value.concat(), pos),
-        Token::NullKeyword { pos, .. } => ("null".to_string(), pos),
-        Token::TrueKeyword { pos, .. } => ("true".to_string(), pos),
-        Token::FalseKeyword { pos, .. } => ("false".to_string(), pos),
-        Token::EachKeyword { pos, .. } => ("each".to_string(), pos),
-        Token::ForKeyword { pos, .. } => ("for".to_string(), pos),
-        Token::LoopKeyword { pos, .. } => ("loop".to_string(), pos),
-        Token::DoKeyword { pos, .. } => ("do".to_string(), pos),
-        Token::WhileKeyword { pos, .. } => ("while".to_string(), pos),
-        Token::BreakKeyword { pos, .. } => ("break".to_string(), pos),
-        Token::ContinueKeyword { pos, .. } => ("continue".to_string(), pos),
-        Token::MatchKeyword { pos, .. } => ("match".to_string(), pos),
-        Token::CaseKeyword { pos, .. } => ("case".to_string(), pos),
-        Token::DefaultKeyword { pos, .. } => ("default".to_string(), pos),
-        Token::IfKeyword { pos, .. } => ("if".to_string(), pos),
-        Token::ElifKeyword { pos, .. } => ("elif".to_string(), pos),
-        Token::ElseKeyword { pos, .. } => ("else".to_string(), pos),
-        Token::ReturnKeyword { pos, .. } => ("return".to_string(), pos),
-        Token::EvalKeyword { pos, .. } => ("eval".to_string(), pos),
-        Token::VarKeyword { pos, .. } => ("var".to_string(), pos),
-        Token::LetKeyword { pos, .. } => ("let".to_string(), pos),
-        Token::ExistsKeyword { pos, .. } => ("exists".to_string(), pos),
+        Token::Identifier { pos, value, .. } => (value.to_string(), pos, true),
+        Token::StringLiteral { pos, value, .. } => (value.concat(), pos, false),
+        Token::NullKeyword { pos, .. } => ("null".to_string(), pos, false),
+        Token::TrueKeyword { pos, .. } => ("true".to_string(), pos, false),
+        Token::FalseKeyword { pos, .. } => ("false".to_string(), pos, false),
+        Token::EachKeyword { pos, .. } => ("each".to_string(), pos, false),
+        Token::ForKeyword { pos, .. } => ("for".to_string(), pos, false),
+        Token::LoopKeyword { pos, .. } => ("loop".to_string(), pos, false),
+        Token::DoKeyword { pos, .. } => ("do".to_string(), pos, false),
+        Token::WhileKeyword { pos, .. } => ("while".to_string(), pos, false),
+        Token::BreakKeyword { pos, .. } => ("break".to_string(), pos, false),
+        Token::ContinueKeyword { pos, .. } => ("continue".to_string(), pos, false),
+        Token::MatchKeyword { pos, .. } => ("match".to_string(), pos, false),
+        Token::CaseKeyword { pos, .. } => ("case".to_string(), pos, false),
+        Token::DefaultKeyword { pos, .. } => ("default".to_string(), pos, false),
+        Token::IfKeyword { pos, .. } => ("if".to_string(), pos, false),
+        Token::ElifKeyword { pos, .. } => ("elif".to_string(), pos, false),
+        Token::ElseKeyword { pos, .. } => ("else".to_string(), pos, false),
+        Token::ReturnKeyword { pos, .. } => ("return".to_string(), pos, false),
+        Token::EvalKeyword { pos, .. } => ("eval".to_string(), pos, false),
+        Token::VarKeyword { pos, .. } => ("var".to_string(), pos, false),
+        Token::LetKeyword { pos, .. } => ("let".to_string(), pos, false),
+        Token::ExistsKeyword { pos, .. } => ("exists".to_string(), pos, false),
         Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
             kind: AiScriptSyntaxErrorKind::UnexpectedEof,
             pos,

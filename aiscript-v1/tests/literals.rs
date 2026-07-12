@@ -1067,6 +1067,61 @@ mod literal {
     }
 
     #[tokio::test]
+    async fn obj_shorthand() {
+        test(
+            r#"
+            let a = 1
+            <: { a }
+            "#,
+            |res| assert_eq!(res, obj([("a", num(1))])),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn obj_reserved_word_as_shorthand() {
+        let err = test(
+            r#"
+            <: { exists }
+            "#,
+            |_| {},
+        )
+        .await
+        .unwrap_err();
+        if let AiScriptError::Syntax(AiScriptSyntaxError {
+            kind: AiScriptSyntaxErrorKind::UnexpectedToken(token),
+            ..
+        }) = err
+        {
+            assert_eq!(token, "CloseBrace");
+        } else {
+            panic!("{err}");
+        };
+    }
+
+    #[tokio::test]
+    async fn obj_string_as_shorthand() {
+        let err = test(
+            r#"
+            <: { "hoge" }
+            "#,
+            |_| {},
+        )
+        .await
+        .unwrap_err();
+        if let AiScriptError::Syntax(AiScriptSyntaxError {
+            kind: AiScriptSyntaxErrorKind::UnexpectedToken(token),
+            ..
+        }) = err
+        {
+            assert_eq!(token, "CloseBrace");
+        } else {
+            panic!("{err}");
+        };
+    }
+
+    #[tokio::test]
     async fn obj_escaped_reserved_word_as_key() {
         let err = test(
             r#"

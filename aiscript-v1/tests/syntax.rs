@@ -975,6 +975,32 @@ mod variable_declaration {
     }
 
     #[tokio::test]
+    async fn destructuring_declaration() {
+        test(
+            r#"
+            let [a, { value: b }] = [1, { value: 2 }]
+            <: [a, b]
+            "#,
+            |res| assert_eq!(res, arr([num(1), num(2)])),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn destructuring_declaration_with_shorthand() {
+        test(
+            r#"
+            let { value } = { value: 1 }
+            <: value
+            "#,
+            |res| assert_eq!(res, num(1)),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
     async fn empty_function() {
         test(
             r#"
