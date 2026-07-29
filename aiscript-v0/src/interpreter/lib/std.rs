@@ -1194,7 +1194,7 @@ pub fn std() -> HashMap<String, Value> {
             let mut args = args.into_iter();
             let result = String::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(match a.cmp(&b) {
+                Ok(Value::num(match a.encode_utf16().cmp(b.encode_utf16()) {
                     std::cmp::Ordering::Less => -1.0,
                     std::cmp::Ordering::Equal => 0.0,
                     std::cmp::Ordering::Greater => 1.0,
@@ -1210,7 +1210,7 @@ pub fn std() -> HashMap<String, Value> {
             let mut args = args.into_iter();
             let result = String::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = String::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::num(match a.cmp(&b) {
+                Ok(Value::num(match a.encode_utf16().cmp(b.encode_utf16()) {
                     std::cmp::Ordering::Less => 1.0,
                     std::cmp::Ordering::Equal => 0.0,
                     std::cmp::Ordering::Greater => -1.0,

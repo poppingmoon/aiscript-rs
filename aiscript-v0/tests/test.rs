@@ -5383,6 +5383,30 @@ mod std {
         }
 
         #[tokio::test]
+        async fn lt() {
+            test(
+                r#"
+                <: [Str:lt("👈", "！"), Str:lt("👈", "👈"), Str:lt("！", "👈")]
+                "#,
+                |res| assert_eq!(res, arr([num(-1), num(0), num(1)])),
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
+        async fn gt() {
+            test(
+                r#"
+                <: [Str:gt("👈", "！"), Str:gt("👈", "👈"), Str:gt("！", "👈")]
+                "#,
+                |res| assert_eq!(res, arr([num(1), num(0), num(-1)])),
+            )
+            .await
+            .unwrap();
+        }
+
+        #[tokio::test]
         async fn from_codepoint() {
             test(
                 r#"
