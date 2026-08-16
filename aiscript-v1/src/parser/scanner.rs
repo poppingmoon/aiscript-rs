@@ -1,12 +1,12 @@
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{is_not, tag, take_till1, take_until},
+    bytes::complete::{tag, take_till, take_till1, take_until},
     character::{
         anychar,
         complete::{alpha1, alphanumeric1, char, digit1, line_ending, multispace1, space0, space1},
     },
-    combinator::{consumed, cut, fail, map, not, opt, peek, recognize, rest, success, value},
+    combinator::{consumed, cut, eof, fail, map, not, opt, peek, recognize, rest, success, value},
     multi::{many0, many1},
     sequence::{delimited, preceded, separated_pair, terminated},
 };
@@ -54,10 +54,12 @@ pub fn read_tokens(input: &str) -> Result<Vec<Token<'_>>, AiScriptSyntaxError> {
                     pos,
                 })
             } else {
-                tokens.push(Token::Eof {
-                    pos,
-                    has_left_spacing: false,
-                });
+                if !matches!(tokens.last(), Some(Token::Eof { .. })) {
+                    tokens.push(Token::Eof {
+                        pos,
+                        has_left_spacing: false,
+                    });
+                }
                 Ok(tokens)
             }
         })
@@ -246,8 +248,20 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
         preceded(
             char('/'),
             alt((
-                preceded(char('*'), preceded(skip_comment_range, read_token)),
-                preceded(char('/'), preceded(skip_comment_line, read_token)),
+                preceded(
+                    char('*'),
+                    preceded(
+                        skip_comment_range,
+                        alt((read_token, |input| read_eof(input, has_left_spacing))),
+                    ),
+                ),
+                preceded(
+                    char('/'),
+                    preceded(
+                        skip_comment_line,
+                        alt((read_token, |input| read_eof(input, has_left_spacing))),
+                    ),
+                ),
                 success(Token::Slash {
                     pos: Pos {
                         line: input.location_line(),
@@ -483,6 +497,20 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
             |input| read_word(input, has_left_spacing),
         )),
     ))
+    .parse(input)
+}
+
+fn read_eof(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
+    value(
+        Token::Eof {
+            pos: Pos {
+                line: input.location_line(),
+                column: input.get_column(),
+            },
+            has_left_spacing,
+        },
+        eof,
+    )
     .parse(input)
 }
 
@@ -845,7 +873,7 @@ fn skip_empty_lines(input: Span, has_left_spacing: bool) -> IResult<Span, Token>
 }
 
 fn skip_comment_line(input: Span) -> IResult<Span, ()> {
-    value((), is_not("\n")).parse(input)
+    value((), take_till(|c| c == '\n')).parse(input)
 }
 
 fn skip_comment_range(input: Span) -> IResult<Span, ()> {
@@ -1084,6 +1112,18 @@ mod tests {
             tokens[5],
             Token::Eof {
                 pos: Pos { line: 3, column: 2 },
+                has_left_spacing: false,
+            }
+        );
+    }
+
+    #[test]
+    fn comment() {
+        let tokens = read_tokens("//").unwrap();
+        assert_eq!(
+            tokens[0],
+            Token::Eof {
+                pos: Pos { line: 1, column: 3 },
                 has_left_spacing: false,
             }
         );
