@@ -174,7 +174,7 @@ impl Visitor for JumpStatementValidator {
 
     fn visit_fn(&mut self, fn_: ast::Fn) -> Result<ast::Fn, AiScriptSyntaxError> {
         let has_ancestor_function = self.has_ancestor_function;
-        let jump_destinations = self.jump_destinations.drain(..).collect();
+        let jump_destinations = std::mem::take(&mut self.jump_destinations);
         let params = fn_
             .params
             .into_iter()
