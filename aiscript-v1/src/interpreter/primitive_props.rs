@@ -112,34 +112,52 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
             "index_of" => Value::fn_native_sync(move |args| {
                 let mut args = args.into_iter();
                 String::try_from(args.next().unwrap_or_default()).and_then(|search| {
-                    let pos = args
-                        .next()
-                        .map(f64::try_from)
-                        .transpose()?
-                        .map(|i| if i < 0.0 { target.len() as f64 + i } else { i });
-                    Ok(Value::num(if let Some(pos) = pos {
-                        let pos = pos as usize;
-                        let pos = target.grapheme_indices(true).nth(pos).map(|(pos, _)| pos);
-                        if let Some(pos) = pos {
-                            target[pos..].find(&search).map_or(-1.0, |index| {
-                                target
-                                    .grapheme_indices(true)
-                                    .enumerate()
-                                    .find(|(_, (i, _))| index <= *i)
-                                    .map_or(-1.0, |(i, _)| (i + pos) as f64)
-                            })
+                    let pos = args.next().map(f64::try_from).transpose()?.map(|i| {
+                        if i < 0.0 {
+                            target.encode_utf16().count() as f64 + i
                         } else {
-                            -1.0
+                            i
                         }
-                    } else {
-                        target.find(&search).map_or(-1.0, |index| {
-                            target
-                                .grapheme_indices(true)
-                                .enumerate()
-                                .find(|(_, (i, _))| index <= *i)
-                                .map_or(-1.0, |(i, _)| i as f64)
-                        })
-                    }))
+                    });
+                    if target.is_empty() {
+                        return Ok(Value::num(if search.is_empty() { 0.0 } else { -1.0 }));
+                    }
+                    let mut target = target.graphemes(true);
+                    let target_length = target.clone().count();
+                    if let Some(pos) = pos {
+                        let i = pos as usize;
+                        if i >= target_length && search.is_empty() {
+                            return Ok(Value::num(target_length as f64));
+                        } else if i as f64 != pos {
+                            return Ok(Value::num(if search.is_empty() { pos } else { -1.0 }));
+                        }
+                        if i >= 1 {
+                            target.nth(i - 1);
+                        }
+                    }
+                    let pos = pos.unwrap_or_default();
+                    if search.is_empty() {
+                        return Ok(Value::num(pos));
+                    }
+                    let search = search.graphemes(true).collect::<Vec<&str>>();
+                    if target_length < search.len() {
+                        return Ok(Value::num(-1.0));
+                    }
+                    let mut queue = target
+                        .by_ref()
+                        .take(search.len())
+                        .collect::<std::collections::VecDeque<&str>>();
+                    if queue == search {
+                        return Ok(Value::num(pos));
+                    }
+                    for (i, s) in target.enumerate() {
+                        queue.pop_front();
+                        queue.push_back(s);
+                        if queue == search {
+                            return Ok(Value::num(pos + 1.0 + i as f64));
+                        }
+                    }
+                    Ok(Value::num(-1.0))
                 })
             }),
             "incl" => Value::fn_native_sync(move |args| {

@@ -195,6 +195,160 @@ mod str {
     }
 
     #[tokio::test]
+    async fn index_of_empty() {
+        test(
+            r#"
+            let str = '0123401234'
+            <: [
+                str.index_of('1'),
+                str.index_of('1', 5.5),
+                str.index_of('1', 10.5),
+                str.index_of('1', -5.5),
+                str.index_of('1', -10.5),
+                str.index_of(''),
+                str.index_of('', 5.5),
+                str.index_of('', 10.5),
+                str.index_of('', -5.5),
+                str.index_of('', -10.5),
+                ''.index_of('1'),
+                ''.index_of('1', 5.5),
+                ''.index_of('1', 10.5),
+                ''.index_of('1', -5.5),
+                ''.index_of('1', -10.5),
+                ''.index_of(''),
+                ''.index_of('', 5.5),
+                ''.index_of('', 10.5),
+                ''.index_of('', -5.5),
+                ''.index_of('', -10.5),
+            ]
+            "#,
+            |res| {
+                assert_eq!(
+                    res,
+                    arr([
+                        num(1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(0),
+                        num(5.5),
+                        num(10),
+                        num(4.5),
+                        num(-0.5),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(0),
+                        num(0),
+                        num(0),
+                        num(0),
+                        num(0),
+                    ])
+                )
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn index_of_unicode() {
+        test(
+            r#"
+            let str = '👍🏽🍆🌮'
+            <: [
+                str.index_of('👍🏽'),
+                str.index_of('👍🏽', 0),
+                str.index_of('👍🏽', 0.5),
+                str.index_of('👍🏽', 1),
+                str.index_of('👍🏽', 2),
+                str.index_of('👍🏽', 3),
+                str.index_of('👍🏽', -1),
+                str.index_of('👍🏽', -2),
+                str.index_of('👍🏽', -3),
+                str.index_of('👍🏽', -7),
+                str.index_of('👍🏽', -8),
+                str.index_of('👍🏽', -8.5),
+                str.index_of('🍆'),
+                str.index_of('🍆', 0),
+                str.index_of('🍆', 0.5),
+                str.index_of('🍆', 1),
+                str.index_of('🍆', 2),
+                str.index_of('🍆', 3),
+                str.index_of('🍆', -1),
+                str.index_of('🍆', -2),
+                str.index_of('🍆', -3),
+                str.index_of('🍆', -6),
+                str.index_of('🍆', -7),
+                str.index_of('🍆', -7.5),
+                str.index_of('🌮'),
+                str.index_of('🌮', 0),
+                str.index_of('🌮', 0.5),
+                str.index_of('🌮', 1),
+                str.index_of('🌮', 2),
+                str.index_of('🌮', 3),
+                str.index_of('🌮', -1),
+                str.index_of('🌮', -2),
+                str.index_of('🌮', -3),
+                str.index_of('🌮', -5),
+                str.index_of('🌮', -6),
+                str.index_of('🌮', -6.5),
+                str.index_of('👍'),
+            ]
+            "#,
+            |res| {
+                assert_eq!(
+                    res,
+                    arr([
+                        num(0),
+                        num(0),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(0),
+                        num(-1),
+                        num(1),
+                        num(1),
+                        num(-1),
+                        num(1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(1),
+                        num(-1),
+                        num(2),
+                        num(2),
+                        num(-1),
+                        num(2),
+                        num(2),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(-1),
+                        num(2),
+                        num(-1),
+                        num(-1),
+                    ])
+                )
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
     async fn incl() {
         test(
             r#"
