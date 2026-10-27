@@ -16,8 +16,13 @@ impl StackExt for Vec<Frame> {
 
     fn run(&mut self, program: Vec<impl Into<Frame>>) {
         self.push(Frame::Run);
-        for node in program.into_iter().rev() {
-            self.push(Frame::Unwind);
+        let mut program = program.into_iter().rev();
+        if let Some(node) = program.next() {
+            self.push(Frame::Unwind { keep: true });
+            self.eval(node);
+        }
+        for node in program {
+            self.push(Frame::Unwind { keep: false });
             self.eval(node);
         }
     }

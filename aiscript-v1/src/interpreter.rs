@@ -1644,7 +1644,7 @@ impl Interpreter {
                         value_stack.push(Value::null());
                     }
                 }
-                Frame::Unwind => {
+                Frame::Unwind { keep } => {
                     if let Some(v) = value_stack.last()
                         && let V::Return(_) | V::Break { .. } | V::Continue { .. } = v.value
                     {
@@ -1653,6 +1653,8 @@ impl Interpreter {
                                 break;
                             }
                         }
+                    } else if !keep {
+                        value_stack.pop_value()?;
                     }
                 }
                 Frame::Eval => {

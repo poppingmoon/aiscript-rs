@@ -173,7 +173,9 @@ pub enum Frame {
         name: String,
     },
     Run,
-    Unwind,
+    Unwind {
+        keep: bool,
+    },
     Eval,
 }
 
