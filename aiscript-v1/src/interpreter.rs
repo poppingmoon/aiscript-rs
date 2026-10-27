@@ -284,27 +284,15 @@ impl Interpreter {
                 statements,
                 scope,
             } => {
-                let mut program = Vec::with_capacity(params.len() + statements.len());
+                let fn_scope = scope.create_child_scope(HashMap::new());
                 for (param, arg) in zip(params, args.into_iter().map(Some).chain(repeat(None))) {
-                    let arg = expect_any(arg.or(param.default));
-                    match arg {
-                        Ok(arg) => program.push(Frame::Definition2 {
-                            dest: param.dest,
-                            value: arg,
-                            mut_: true,
-                        }),
-                        Err(e) => return async { Err(e) }.boxed(),
+                    let result = expect_any(arg.or(param.default))
+                        .and_then(|arg| fn_scope.define(param.dest, arg, true));
+                    if let Err(e) = result {
+                        return async { Err(e) }.boxed();
                     }
                 }
-                for node in statements.into_iter() {
-                    program.push(node.into());
-                }
-                async move {
-                    self.run(program, &scope.create_child_scope(HashMap::new()))
-                        .await
-                        .map(unwrap_ret)
-                }
-                .boxed()
+                async move { self.run(statements, &fn_scope).await.map(unwrap_ret) }.boxed()
             }
             VFn::FnNative(fn_) => fn_(args.into_iter().collect(), self),
             VFn::FnNativeSync(fn_) => {
@@ -336,7 +324,7 @@ impl Interpreter {
                             attr,
                             ..
                         } = *definition;
-                        stack.push(Frame::Definition1 { dest, mut_, attr });
+                        stack.push(Frame::Definition { dest, mut_, attr });
                         stack.eval(expr);
                     }
                     ast::Statement::Return(return_) => {
@@ -693,7 +681,7 @@ impl Interpreter {
                         stack.eval(*target);
                     }
                 },
-                Frame::Definition1 { dest, mut_, attr } => {
+                Frame::Definition { dest, mut_, attr } => {
                     let mut value = value_stack.pop_value()?;
                     if value.is_control() {
                         value_stack.push(value);
@@ -705,43 +693,10 @@ impl Interpreter {
                                 })
                                 .collect()
                         });
-                        stack.push(Frame::Definition2 { dest, mut_, value });
+                        scope.define(dest, value, mut_)?;
                         value_stack.push(Value::null());
                     }
                 }
-                Frame::Definition2 { dest, value, mut_ } => match dest {
-                    ast::Expression::Identifier(identifier) => {
-                        scope.add(
-                            identifier.name,
-                            if mut_ {
-                                Variable::Mut(value)
-                            } else {
-                                Variable::Const(value)
-                            },
-                        )?;
-                    }
-                    ast::Expression::Arr(arr) => {
-                        let value = <Vec<Value>>::try_from(value)?;
-                        for (index, item) in arr.value.into_iter().enumerate().rev() {
-                            stack.push(Frame::Definition2 {
-                                dest: item,
-                                value: value.get(index).cloned().unwrap_or_default(),
-                                mut_,
-                            })
-                        }
-                    }
-                    ast::Expression::Obj(obj) => {
-                        let value = <IndexMap<String, Value>>::try_from(value)?;
-                        for (key, item) in obj.value.into_iter().rev() {
-                            stack.push(Frame::Definition2 {
-                                dest: item,
-                                value: value.get(&key).cloned().unwrap_or_default(),
-                                mut_,
-                            });
-                        }
-                    }
-                    _ => Err(AiScriptRuntimeError::InvalidDefinition)?,
-                },
                 Frame::Return => {
                     let val = value_stack.pop_value()?;
                     value_stack.push(if val.is_control() {
@@ -779,12 +734,8 @@ impl Interpreter {
                             for_: for_.clone(),
                         });
                         scope = scope.create_child_scope(HashMap::new());
+                        scope.define(var, item, false)?;
                         stack.eval(for_);
-                        stack.push(Frame::Definition2 {
-                            dest: var,
-                            value: item,
-                            mut_: false,
-                        });
                     } else {
                         value_stack.push(Value::null());
                     }
@@ -1597,21 +1548,13 @@ impl Interpreter {
                     } => {
                         stack.push(Frame::Call5 { scope });
                         scope = fn_scope.create_child_scope(HashMap::new());
-                        let mut definitions = Vec::with_capacity(params.len());
                         for (param, arg) in
                             zip(params, args.into_iter().map(Some).chain(repeat(None)))
                         {
                             let arg = expect_any(arg.or(param.default))?;
-                            definitions.push((param.dest, arg));
+                            scope.define(param.dest, arg, true)?;
                         }
                         stack.run(statements);
-                        while let Some((dest, arg)) = definitions.pop() {
-                            stack.push(Frame::Definition2 {
-                                dest,
-                                value: arg,
-                                mut_: true,
-                            })
-                        }
                     }
                     VFn::FnNative(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);

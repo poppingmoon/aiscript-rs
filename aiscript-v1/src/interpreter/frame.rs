@@ -11,15 +11,10 @@ use super::{
 pub enum Frame {
     Statement(Statement),
     Expression(Expression),
-    Definition1 {
+    Definition {
         dest: Expression,
         mut_: bool,
         attr: Option<Vec<Attribute>>,
-    },
-    Definition2 {
-        dest: Expression,
-        value: Value,
-        mut_: bool,
     },
     Return,
     Each1 {

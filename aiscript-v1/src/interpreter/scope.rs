@@ -3,7 +3,10 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use indexmap::IndexMap;
+
 use crate::error::{AiScriptError, AiScriptRuntimeError};
+use crate::node::Expression;
 
 use super::{value::Value, variable::Variable};
 
@@ -163,6 +166,47 @@ impl Scope {
                     })?
                 }
             }
+        }
+    }
+
+    pub fn define(
+        &self,
+        dest: Expression,
+        value: Value,
+        is_mutable: bool,
+    ) -> Result<(), AiScriptError> {
+        match dest {
+            Expression::Identifier(identifier) => self.add(
+                identifier.name,
+                if is_mutable {
+                    Variable::Mut(value)
+                } else {
+                    Variable::Const(value)
+                },
+            ),
+            Expression::Arr(arr) => {
+                let value = <Vec<Value>>::try_from(value)?;
+                for (index, item) in arr.value.into_iter().enumerate() {
+                    self.define(
+                        item,
+                        value.get(index).cloned().unwrap_or_default(),
+                        is_mutable,
+                    )?;
+                }
+                Ok(())
+            }
+            Expression::Obj(obj) => {
+                let value = <IndexMap<String, Value>>::try_from(value)?;
+                for (key, item) in obj.value {
+                    self.define(
+                        item,
+                        value.get(&key).cloned().unwrap_or_default(),
+                        is_mutable,
+                    )?;
+                }
+                Ok(())
+            }
+            _ => Err(AiScriptRuntimeError::InvalidDefinition)?,
         }
     }
 
