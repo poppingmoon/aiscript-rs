@@ -78,7 +78,12 @@ pub enum Frame {
         dest: Expression,
         value: Value,
     },
-    AssignIndex {
+    AssignIndex1 {
+        index: Expression,
+        value: Value,
+    },
+    AssignIndex2 {
+        assignee: Value,
         value: Value,
     },
     AssignProp {
@@ -158,7 +163,12 @@ pub enum Frame {
     Call3 {
         scope: Scope,
     },
-    Index,
+    Index1 {
+        index: Expression,
+    },
+    Index2 {
+        target: Value,
+    },
     Prop {
         name: String,
     },

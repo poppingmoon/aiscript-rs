@@ -1291,6 +1291,62 @@ mod array {
             AiScriptError::Runtime(AiScriptRuntimeError::IndexOutOfRange(_, _))
         ));
     }
+
+    #[tokio::test]
+    async fn index_access_with_function_call() {
+        test(
+            r#"
+            let a = [1]
+            @f() {
+                null
+                0
+            }
+            <: a[f()]
+            "#,
+            |res| assert_eq!(res, num(1)),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn index_assign_with_function_call() {
+        test(
+            r#"
+            let a = [1]
+            @f() {
+                null
+                0
+            }
+            a[f()] = 2
+            <: a
+            "#,
+            |res| assert_eq!(res, arr([num(2)])),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn target_evaluated_before_index() {
+        test(
+            r#"
+            let arr = []
+            @f() {
+                arr.push("a")
+                [1]
+            }
+            @g() {
+                arr.push("b")
+                0
+            }
+            <: [f()[g()], arr]
+            "#,
+            |res| assert_eq!(res, arr([num(1), arr([str("a"), str("b")])])),
+        )
+        .await
+        .unwrap();
+    }
 }
 
 mod chain {

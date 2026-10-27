@@ -474,8 +474,9 @@ impl Interpreter {
                         stack.eval(*call.target);
                     }
                     ast::Expression::Index(index) => {
-                        stack.push(Frame::Index);
-                        stack.eval(*index.index);
+                        stack.push(Frame::Index1 {
+                            index: *index.index,
+                        });
                         stack.eval(*index.target);
                     }
                     ast::Expression::Prop(prop) => {
@@ -648,8 +649,10 @@ impl Interpreter {
                         value_stack.push(Value::null());
                     }
                     ast::Expression::Index(index) => {
-                        stack.push(Frame::AssignIndex { value });
-                        stack.eval(*index.index);
+                        stack.push(Frame::AssignIndex1 {
+                            index: *index.index,
+                            value,
+                        });
                         stack.eval(*index.target);
                     }
                     ast::Expression::Prop(prop) => {
@@ -692,9 +695,13 @@ impl Interpreter {
                             property/index access.",
                     ))?,
                 },
-                Frame::AssignIndex { value } => {
-                    let i = value_stack.pop_value()?;
+                Frame::AssignIndex1 { index, value } => {
                     let assignee = value_stack.pop_value()?;
+                    stack.push(Frame::AssignIndex2 { assignee, value });
+                    stack.eval(index);
+                }
+                Frame::AssignIndex2 { assignee, value } => {
+                    let i = value_stack.pop_value()?;
                     match assignee.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
@@ -929,9 +936,13 @@ impl Interpreter {
                     let r = value_stack.pop_value()?;
                     value_stack.push(unwrap_ret(r));
                 }
-                Frame::Index => {
-                    let i = value_stack.pop_value()?;
+                Frame::Index1 { index } => {
                     let target = value_stack.pop_value()?;
+                    stack.push(Frame::Index2 { target });
+                    stack.eval(index);
+                }
+                Frame::Index2 { target } => {
+                    let i = value_stack.pop_value()?;
                     match target.value {
                         V::Arr(arr) => {
                             let i = f64::try_from(i)?;
