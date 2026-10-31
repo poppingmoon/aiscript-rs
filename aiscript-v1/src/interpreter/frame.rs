@@ -241,7 +241,6 @@ pub enum Frame {
     Unwind {
         keep: bool,
     },
-    Eval,
 }
 
 impl From<StatementOrExpression> for Frame {

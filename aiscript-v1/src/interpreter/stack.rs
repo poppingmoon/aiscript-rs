@@ -11,7 +11,6 @@ pub trait StackExt {
 impl StackExt for Vec<Frame> {
     fn eval(&mut self, node: impl Into<Frame>) {
         self.push(node.into());
-        self.push(Frame::Eval);
     }
 
     fn run(&mut self, program: Vec<impl Into<Frame>>) {

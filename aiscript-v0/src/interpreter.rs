@@ -46,7 +46,7 @@ mod variable;
 
 #[derive(Clone, Default)]
 pub struct Interpreter {
-    pub step_count: Arc<AtomicUsize>,
+    step_count: Arc<AtomicUsize>,
     stop: Arc<AtomicBool>,
     pub scope: Scope,
     abort_handlers: Arc<Mutex<tokio::task::JoinSet<Result<(), AiScriptError>>>>,
@@ -326,164 +326,186 @@ impl Interpreter {
 
         while let Some(frame) = stack.pop() {
             match frame {
-                Frame::Statement(statement) => match statement {
-                    ast::Statement::Definition(definition) => {
-                        stack.push(Frame::Definition {
-                            name: definition.name,
-                            mut_: definition.mut_,
-                        });
-                        stack.eval(definition.expr);
+                Frame::Statement(statement) => {
+                    if self.stop.load(Ordering::Relaxed) {
+                        return Ok(Value::null());
                     }
-                    ast::Statement::Return(return_) => {
-                        stack.push(Frame::Return);
-                        stack.eval(return_.expr);
-                    }
-                    ast::Statement::Each(each) => {
-                        stack.push(Frame::Each1 {
-                            var: each.var,
-                            for_: *each.for_,
-                        });
-                        stack.eval(each.items);
-                    }
-                    ast::Statement::For(for_) => {
-                        if let Some(times) = for_.times {
-                            stack.push(Frame::For1 { for_: *for_.for_ });
-                            stack.eval(times);
-                        } else if let ast::For {
-                            var: Some(var),
-                            from: Some(from),
-                            to: Some(to),
-                            for_,
-                            ..
-                        } = *for_
-                        {
-                            stack.push(Frame::ForLet1 {
-                                var,
-                                to,
-                                for_: *for_,
-                            });
-                            stack.eval(from);
+                    if let Some(max_step) = self.max_step {
+                        let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
+                        if step_count > max_step {
+                            Err(AiScriptRuntimeError::runtime("max step exceeded"))?
                         }
                     }
-                    ast::Statement::Loop(loop_) => stack.push(Frame::Loop1 {
-                        statements: loop_.statements,
-                    }),
-                    ast::Statement::Break(_) => value_stack.push(Value::break_()),
-                    ast::Statement::Continue(_) => value_stack.push(Value::continue_()),
-                    ast::Statement::Assign(assign) => {
-                        stack.push(Frame::Assign1 { dest: assign.dest });
-                        stack.eval(assign.expr);
+                    match statement {
+                        ast::Statement::Definition(definition) => {
+                            stack.push(Frame::Definition {
+                                name: definition.name,
+                                mut_: definition.mut_,
+                            });
+                            stack.eval(definition.expr);
+                        }
+                        ast::Statement::Return(return_) => {
+                            stack.push(Frame::Return);
+                            stack.eval(return_.expr);
+                        }
+                        ast::Statement::Each(each) => {
+                            stack.push(Frame::Each1 {
+                                var: each.var,
+                                for_: *each.for_,
+                            });
+                            stack.eval(each.items);
+                        }
+                        ast::Statement::For(for_) => {
+                            if let Some(times) = for_.times {
+                                stack.push(Frame::For1 { for_: *for_.for_ });
+                                stack.eval(times);
+                            } else if let ast::For {
+                                var: Some(var),
+                                from: Some(from),
+                                to: Some(to),
+                                for_,
+                                ..
+                            } = *for_
+                            {
+                                stack.push(Frame::ForLet1 {
+                                    var,
+                                    to,
+                                    for_: *for_,
+                                });
+                                stack.eval(from);
+                            }
+                        }
+                        ast::Statement::Loop(loop_) => stack.push(Frame::Loop1 {
+                            statements: loop_.statements,
+                        }),
+                        ast::Statement::Break(_) => value_stack.push(Value::break_()),
+                        ast::Statement::Continue(_) => value_stack.push(Value::continue_()),
+                        ast::Statement::Assign(assign) => {
+                            stack.push(Frame::Assign1 { dest: assign.dest });
+                            stack.eval(assign.expr);
+                        }
+                        ast::Statement::AddAssign(add_assign) => {
+                            stack.push(Frame::AddAssign1 {
+                                dest: add_assign.dest.clone(),
+                                expr: add_assign.expr,
+                            });
+                            stack.eval(add_assign.dest);
+                        }
+                        ast::Statement::SubAssign(sub_assign) => {
+                            stack.push(Frame::SubAssign1 {
+                                dest: sub_assign.dest.clone(),
+                                expr: sub_assign.expr,
+                            });
+                            stack.eval(sub_assign.dest);
+                        }
                     }
-                    ast::Statement::AddAssign(add_assign) => {
-                        stack.push(Frame::AddAssign1 {
-                            dest: add_assign.dest.clone(),
-                            expr: add_assign.expr,
-                        });
-                        stack.eval(add_assign.dest);
+                }
+                Frame::Expression(expression) => {
+                    if self.stop.load(Ordering::Relaxed) {
+                        return Ok(Value::null());
                     }
-                    ast::Statement::SubAssign(sub_assign) => {
-                        stack.push(Frame::SubAssign1 {
-                            dest: sub_assign.dest.clone(),
-                            expr: sub_assign.expr,
-                        });
-                        stack.eval(sub_assign.dest);
+                    if let Some(max_step) = self.max_step {
+                        let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
+                        if step_count > max_step {
+                            Err(AiScriptRuntimeError::runtime("max step exceeded"))?
+                        }
                     }
-                },
-                Frame::Expression(expression) => match expression {
-                    ast::Expression::If(if_) => {
-                        let mut elseif = if_.elseif;
-                        elseif.reverse();
-                        stack.push(Frame::If {
-                            then: *if_.then,
-                            elseif,
-                            else_: if_.else_,
-                        });
-                        stack.eval(*if_.cond);
+                    match expression {
+                        ast::Expression::If(if_) => {
+                            let mut elseif = if_.elseif;
+                            elseif.reverse();
+                            stack.push(Frame::If {
+                                then: *if_.then,
+                                elseif,
+                                else_: if_.else_,
+                            });
+                            stack.eval(*if_.cond);
+                        }
+                        ast::Expression::Fn(fn_) => {
+                            let scope = scope.clone();
+                            value_stack.push(Value::fn_(
+                                fn_.args.into_iter().map(|arg| arg.name),
+                                fn_.children,
+                                scope.into(),
+                            ));
+                        }
+                        ast::Expression::Match(match_) => {
+                            stack.push(Frame::Match1 {
+                                qs: match_.qs,
+                                default: match_.default,
+                            });
+                            stack.eval(*match_.about);
+                        }
+                        ast::Expression::Block(block) => {
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.push(Frame::Block);
+                            stack.run(block.statements);
+                        }
+                        ast::Expression::Exists(exists) => {
+                            let exists = scope.exists(&exists.identifier.name)?;
+                            value_stack.push(Value::bool(exists));
+                        }
+                        ast::Expression::Tmpl(tmpl) => {
+                            let mut tmpl = tmpl.tmpl;
+                            tmpl.reverse();
+                            stack.push(Frame::Tmpl1 {
+                                tmpl,
+                                str: String::new(),
+                            });
+                        }
+                        ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
+                        ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
+                        ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
+                        ast::Expression::Null(_) => value_stack.push(Value::null()),
+                        ast::Expression::Obj(obj) => {
+                            let mut obj = obj.value;
+                            obj.reverse();
+                            stack.push(Frame::Obj1 {
+                                obj: obj.into(),
+                                map: IndexMap::new().into(),
+                            });
+                        }
+                        ast::Expression::Arr(arr) => {
+                            let arr = try_join_all(
+                                arr.value
+                                    .into_iter()
+                                    .map(|expr| self.run(vec![expr], &scope)),
+                            )
+                            .await?;
+                            value_stack.push(Value::arr(arr));
+                        }
+                        ast::Expression::Not(not) => {
+                            stack.push(Frame::Not);
+                            stack.eval(*not.expr);
+                        }
+                        ast::Expression::And(and) => {
+                            stack.push(Frame::And1 { right: *and.right });
+                            stack.eval(*and.left);
+                        }
+                        ast::Expression::Or(or) => {
+                            stack.push(Frame::Or1 { right: *or.right });
+                            stack.eval(*or.left);
+                        }
+                        ast::Expression::Identifier(identifier) => {
+                            let value = scope.get(&identifier.name)?;
+                            value_stack.push(value);
+                        }
+                        ast::Expression::Call(call) => {
+                            stack.push(Frame::Call1 { args: call.args });
+                            stack.eval(*call.target);
+                        }
+                        ast::Expression::Index(index) => {
+                            stack.push(Frame::Index1 {
+                                index: *index.index,
+                            });
+                            stack.eval(*index.target);
+                        }
+                        ast::Expression::Prop(prop) => {
+                            stack.push(Frame::Prop { name: prop.name });
+                            stack.eval(*prop.target);
+                        }
                     }
-                    ast::Expression::Fn(fn_) => {
-                        let scope = scope.clone();
-                        value_stack.push(Value::fn_(
-                            fn_.args.into_iter().map(|arg| arg.name),
-                            fn_.children,
-                            scope.into(),
-                        ));
-                    }
-                    ast::Expression::Match(match_) => {
-                        stack.push(Frame::Match1 {
-                            qs: match_.qs,
-                            default: match_.default,
-                        });
-                        stack.eval(*match_.about);
-                    }
-                    ast::Expression::Block(block) => {
-                        scope = scope.create_child_scope(HashMap::new());
-                        stack.push(Frame::Block);
-                        stack.run(block.statements);
-                    }
-                    ast::Expression::Exists(exists) => {
-                        let exists = scope.exists(&exists.identifier.name)?;
-                        value_stack.push(Value::bool(exists));
-                    }
-                    ast::Expression::Tmpl(tmpl) => {
-                        let mut tmpl = tmpl.tmpl;
-                        tmpl.reverse();
-                        stack.push(Frame::Tmpl1 {
-                            tmpl,
-                            str: String::new(),
-                        });
-                    }
-                    ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
-                    ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
-                    ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
-                    ast::Expression::Null(_) => value_stack.push(Value::null()),
-                    ast::Expression::Obj(obj) => {
-                        let mut obj = obj.value;
-                        obj.reverse();
-                        stack.push(Frame::Obj1 {
-                            obj: obj.into(),
-                            map: IndexMap::new().into(),
-                        });
-                    }
-                    ast::Expression::Arr(arr) => {
-                        let arr = try_join_all(
-                            arr.value
-                                .into_iter()
-                                .map(|expr| self.run(vec![expr], &scope)),
-                        )
-                        .await?;
-                        value_stack.push(Value::arr(arr));
-                    }
-                    ast::Expression::Not(not) => {
-                        stack.push(Frame::Not);
-                        stack.eval(*not.expr);
-                    }
-                    ast::Expression::And(and) => {
-                        stack.push(Frame::And1 { right: *and.right });
-                        stack.eval(*and.left);
-                    }
-                    ast::Expression::Or(or) => {
-                        stack.push(Frame::Or1 { right: *or.right });
-                        stack.eval(*or.left);
-                    }
-                    ast::Expression::Identifier(identifier) => {
-                        let value = scope.get(&identifier.name)?;
-                        value_stack.push(value);
-                    }
-                    ast::Expression::Call(call) => {
-                        stack.push(Frame::Call1 { args: call.args });
-                        stack.eval(*call.target);
-                    }
-                    ast::Expression::Index(index) => {
-                        stack.push(Frame::Index1 {
-                            index: *index.index,
-                        });
-                        stack.eval(*index.target);
-                    }
-                    ast::Expression::Prop(prop) => {
-                        stack.push(Frame::Prop { name: prop.name });
-                        stack.eval(*prop.target);
-                    }
-                },
+                }
                 Frame::Definition { name, mut_ } => {
                     let value = value_stack.pop_value()?;
                     scope.add(
@@ -1013,17 +1035,6 @@ impl Interpreter {
                         }
                     } else if !keep {
                         value_stack.pop_value()?;
-                    }
-                }
-                Frame::Eval => {
-                    if self.stop.load(Ordering::Acquire) {
-                        return Ok(Value::null());
-                    }
-                    let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
-                    if let Some(max_step) = self.max_step
-                        && step_count > max_step
-                    {
-                        Err(AiScriptRuntimeError::runtime("max step exceeded"))?
                     }
                 }
             }

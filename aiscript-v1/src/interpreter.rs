@@ -47,7 +47,7 @@ mod variable;
 
 #[derive(Clone, Default)]
 pub struct Interpreter {
-    pub step_count: Arc<AtomicUsize>,
+    step_count: Arc<AtomicUsize>,
     stop: Arc<AtomicBool>,
     pub scope: Scope,
     abort_handlers: Arc<Mutex<tokio::task::JoinSet<Result<(), AiScriptError>>>>,
@@ -315,372 +315,394 @@ impl Interpreter {
 
         while let Some(frame) = stack.pop() {
             match frame {
-                Frame::Statement(statement) => match statement {
-                    ast::Statement::Definition(definition) => {
-                        let ast::Definition {
-                            dest,
-                            expr,
-                            mut_,
-                            attr,
-                            ..
-                        } = *definition;
-                        stack.push(Frame::Definition { dest, mut_, attr });
-                        stack.eval(expr);
+                Frame::Statement(statement) => {
+                    if self.stop.load(Ordering::Relaxed) {
+                        return Ok(Value::null());
                     }
-                    ast::Statement::Return(return_) => {
-                        stack.push(Frame::Return);
-                        stack.eval(return_.expr);
-                    }
-                    ast::Statement::Each(each) => {
-                        let ast::Each {
-                            label,
-                            var,
-                            items,
-                            for_,
-                            ..
-                        } = *each;
-                        stack.push(Frame::Each1 {
-                            label,
-                            var,
-                            for_: *for_,
-                        });
-                        stack.eval(items);
-                    }
-                    ast::Statement::For(for_) => {
-                        let ast::For {
-                            label, times, for_, ..
-                        } = *for_;
-                        stack.push(Frame::For1 { label, for_: *for_ });
-                        stack.eval(times);
-                    }
-                    ast::Statement::ForLet(for_let) => {
-                        let ast::ForLet {
-                            label,
-                            var,
-                            from,
-                            to,
-                            for_,
-                            ..
-                        } = *for_let;
-                        stack.push(Frame::ForLet1 {
-                            label,
-                            var,
-                            to,
-                            for_: *for_,
-                        });
-                        stack.eval(from);
-                    }
-                    ast::Statement::Loop(loop_) => {
-                        let ast::Loop {
-                            label, statements, ..
-                        } = *loop_;
-                        stack.push(Frame::Loop1 { label, statements })
-                    }
-                    ast::Statement::Break(break_) => {
-                        let ast::Break { label, expr, .. } = *break_;
-                        if let Some(expr) = expr {
-                            stack.push(Frame::Break { label });
-                            stack.eval(expr);
-                        } else {
-                            value_stack.push(Value::break_(label, None));
+                    if let Some(max_step) = self.max_step {
+                        let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
+                        if step_count > max_step {
+                            Err(AiScriptRuntimeError::MaxStepExceeded)?
                         }
                     }
-                    ast::Statement::Continue(continue_) => {
-                        value_stack.push(Value::continue_(continue_.label))
-                    }
-                    ast::Statement::Assign(assign) => {
-                        let ast::Assign { dest, expr, .. } = *assign;
-                        stack.push(Frame::Assign {
-                            dest,
-                            expr: Some(expr),
-                            op: None,
-                        });
-                        value_stack.push(Value::null());
-                    }
-                    ast::Statement::AddAssign(add_assign) => {
-                        let ast::AddAssign { dest, expr, .. } = *add_assign;
-                        stack.push(Frame::Assign {
-                            dest,
-                            expr: Some(expr),
-                            op: Some(AssignmentOperator::Add),
-                        });
-                        value_stack.push(Value::null());
-                    }
-                    ast::Statement::SubAssign(sub_assign) => {
-                        let ast::SubAssign { dest, expr, .. } = *sub_assign;
-                        stack.push(Frame::Assign {
-                            dest,
-                            expr: Some(expr),
-                            op: Some(AssignmentOperator::Sub),
-                        });
-                        value_stack.push(Value::null());
-                    }
-                },
-                Frame::Expression(expression) => match expression {
-                    ast::Expression::If(if_) => {
-                        let ast::If {
-                            label,
-                            cond,
-                            then,
-                            mut elseif,
-                            else_,
-                            ..
-                        } = *if_;
-                        elseif.reverse();
-                        stack.push(Frame::If1 {
-                            label,
-                            then: *then,
-                            elseif,
-                            else_,
-                        });
-                        stack.eval(*cond);
-                    }
-                    ast::Expression::Fn(fn_) => {
-                        let ast::Fn {
-                            params, children, ..
-                        } = *fn_;
-                        let params = try_join_all(params.into_iter().map(async |param| {
-                            Ok::<VFnParam, AiScriptError>(VFnParam {
-                                dest: param.dest,
-                                default: if let Some(default) = param.default {
-                                    Some(self.run(vec![default], &scope).await?)
-                                } else if param.optional {
-                                    Some(Value::null())
-                                } else {
-                                    None
-                                },
-                            })
-                        }))
-                        .await?;
-                        value_stack.push(
-                            if let Some(control) = params.iter().find_map(|param| {
-                                param.default.as_ref().filter(|&value| value.is_control())
-                            }) {
-                                control.clone()
+                    match statement {
+                        ast::Statement::Definition(definition) => {
+                            let ast::Definition {
+                                dest,
+                                expr,
+                                mut_,
+                                attr,
+                                ..
+                            } = *definition;
+                            stack.push(Frame::Definition { dest, mut_, attr });
+                            stack.eval(expr);
+                        }
+                        ast::Statement::Return(return_) => {
+                            stack.push(Frame::Return);
+                            stack.eval(return_.expr);
+                        }
+                        ast::Statement::Each(each) => {
+                            let ast::Each {
+                                label,
+                                var,
+                                items,
+                                for_,
+                                ..
+                            } = *each;
+                            stack.push(Frame::Each1 {
+                                label,
+                                var,
+                                for_: *for_,
+                            });
+                            stack.eval(items);
+                        }
+                        ast::Statement::For(for_) => {
+                            let ast::For {
+                                label, times, for_, ..
+                            } = *for_;
+                            stack.push(Frame::For1 { label, for_: *for_ });
+                            stack.eval(times);
+                        }
+                        ast::Statement::ForLet(for_let) => {
+                            let ast::ForLet {
+                                label,
+                                var,
+                                from,
+                                to,
+                                for_,
+                                ..
+                            } = *for_let;
+                            stack.push(Frame::ForLet1 {
+                                label,
+                                var,
+                                to,
+                                for_: *for_,
+                            });
+                            stack.eval(from);
+                        }
+                        ast::Statement::Loop(loop_) => {
+                            let ast::Loop {
+                                label, statements, ..
+                            } = *loop_;
+                            stack.push(Frame::Loop1 { label, statements })
+                        }
+                        ast::Statement::Break(break_) => {
+                            let ast::Break { label, expr, .. } = *break_;
+                            if let Some(expr) = expr {
+                                stack.push(Frame::Break { label });
+                                stack.eval(expr);
                             } else {
-                                Value::fn_(
-                                    params,
-                                    children,
-                                    scope.create_child_scope(HashMap::new()),
-                                )
-                            },
-                        );
+                                value_stack.push(Value::break_(label, None));
+                            }
+                        }
+                        ast::Statement::Continue(continue_) => {
+                            value_stack.push(Value::continue_(continue_.label))
+                        }
+                        ast::Statement::Assign(assign) => {
+                            let ast::Assign { dest, expr, .. } = *assign;
+                            stack.push(Frame::Assign {
+                                dest,
+                                expr: Some(expr),
+                                op: None,
+                            });
+                            value_stack.push(Value::null());
+                        }
+                        ast::Statement::AddAssign(add_assign) => {
+                            let ast::AddAssign { dest, expr, .. } = *add_assign;
+                            stack.push(Frame::Assign {
+                                dest,
+                                expr: Some(expr),
+                                op: Some(AssignmentOperator::Add),
+                            });
+                            value_stack.push(Value::null());
+                        }
+                        ast::Statement::SubAssign(sub_assign) => {
+                            let ast::SubAssign { dest, expr, .. } = *sub_assign;
+                            stack.push(Frame::Assign {
+                                dest,
+                                expr: Some(expr),
+                                op: Some(AssignmentOperator::Sub),
+                            });
+                            value_stack.push(Value::null());
+                        }
                     }
-                    ast::Expression::Match(match_) => {
-                        let ast::Match {
-                            label,
-                            about,
-                            qs,
-                            default,
-                            ..
-                        } = *match_;
-                        stack.push(Frame::Match1 { label, qs, default });
-                        stack.eval(*about);
+                }
+                Frame::Expression(expression) => {
+                    if self.stop.load(Ordering::Relaxed) {
+                        return Ok(Value::null());
                     }
-                    ast::Expression::Block(block) => {
-                        let ast::Block {
-                            label, statements, ..
-                        } = *block;
-                        scope = scope.create_child_scope(HashMap::new());
-                        stack.push(Frame::Block { label });
-                        stack.run(statements);
+                    if let Some(max_step) = self.max_step {
+                        let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
+                        if step_count > max_step {
+                            Err(AiScriptRuntimeError::MaxStepExceeded)?
+                        }
                     }
-                    ast::Expression::Exists(exists) => {
-                        let exists = scope.exists(&exists.identifier.name)?;
-                        value_stack.push(Value::bool(exists));
+                    match expression {
+                        ast::Expression::If(if_) => {
+                            let ast::If {
+                                label,
+                                cond,
+                                then,
+                                mut elseif,
+                                else_,
+                                ..
+                            } = *if_;
+                            elseif.reverse();
+                            stack.push(Frame::If1 {
+                                label,
+                                then: *then,
+                                elseif,
+                                else_,
+                            });
+                            stack.eval(*cond);
+                        }
+                        ast::Expression::Fn(fn_) => {
+                            let ast::Fn {
+                                params, children, ..
+                            } = *fn_;
+                            let params = try_join_all(params.into_iter().map(async |param| {
+                                Ok::<VFnParam, AiScriptError>(VFnParam {
+                                    dest: param.dest,
+                                    default: if let Some(default) = param.default {
+                                        Some(self.run(vec![default], &scope).await?)
+                                    } else if param.optional {
+                                        Some(Value::null())
+                                    } else {
+                                        None
+                                    },
+                                })
+                            }))
+                            .await?;
+                            value_stack.push(
+                                if let Some(control) = params.iter().find_map(|param| {
+                                    param.default.as_ref().filter(|&value| value.is_control())
+                                }) {
+                                    control.clone()
+                                } else {
+                                    Value::fn_(
+                                        params,
+                                        children,
+                                        scope.create_child_scope(HashMap::new()),
+                                    )
+                                },
+                            );
+                        }
+                        ast::Expression::Match(match_) => {
+                            let ast::Match {
+                                label,
+                                about,
+                                qs,
+                                default,
+                                ..
+                            } = *match_;
+                            stack.push(Frame::Match1 { label, qs, default });
+                            stack.eval(*about);
+                        }
+                        ast::Expression::Block(block) => {
+                            let ast::Block {
+                                label, statements, ..
+                            } = *block;
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.push(Frame::Block { label });
+                            stack.run(statements);
+                        }
+                        ast::Expression::Exists(exists) => {
+                            let exists = scope.exists(&exists.identifier.name)?;
+                            value_stack.push(Value::bool(exists));
+                        }
+                        ast::Expression::Tmpl(tmpl) => {
+                            let mut tmpl = tmpl.tmpl;
+                            tmpl.reverse();
+                            stack.push(Frame::Tmpl1 {
+                                tmpl,
+                                str: String::new(),
+                            });
+                        }
+                        ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
+                        ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
+                        ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
+                        ast::Expression::Null(_) => value_stack.push(Value::null()),
+                        ast::Expression::Obj(obj) => {
+                            let mut obj = obj.value;
+                            let len = obj.len();
+                            obj.reverse();
+                            stack.push(Frame::Obj1 {
+                                obj: obj.into(),
+                                value: IndexMap::with_capacity(len).into(),
+                            });
+                        }
+                        ast::Expression::Arr(arr) => {
+                            let mut arr = arr.value;
+                            let len = arr.len();
+                            arr.reverse();
+                            stack.push(Frame::Arr1 {
+                                arr,
+                                value: Vec::with_capacity(len),
+                            })
+                        }
+                        ast::Expression::Plus(plus) => {
+                            stack.push(Frame::Plus);
+                            stack.eval(*plus.expr);
+                        }
+                        ast::Expression::Minus(minus) => {
+                            stack.push(Frame::Minus);
+                            stack.eval(*minus.expr);
+                        }
+                        ast::Expression::Not(not) => {
+                            stack.push(Frame::Not);
+                            stack.eval(*not.expr);
+                        }
+                        ast::Expression::Pow(pow) => {
+                            let callee = scope.get("Core:pow")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Pow { left, right, .. } = *pow;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Mul(mul) => {
+                            let callee = scope.get("Core:mul")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Mul { left, right, .. } = *mul;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Div(div) => {
+                            let callee = scope.get("Core:div")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Div { left, right, .. } = *div;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Rem(rem) => {
+                            let callee = scope.get("Core:mod")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Rem { left, right, .. } = *rem;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Add(add) => {
+                            let callee = scope.get("Core:add")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Add { left, right, .. } = *add;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Sub(sub) => {
+                            let callee = scope.get("Core:sub")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Sub { left, right, .. } = *sub;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Lt(lt) => {
+                            let callee = scope.get("Core:lt")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Lt { left, right, .. } = *lt;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Lteq(lteq) => {
+                            let callee = scope.get("Core:lteq")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Lteq { left, right, .. } = *lteq;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Gt(gt) => {
+                            let callee = scope.get("Core:gt")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Gt { left, right, .. } = *gt;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Gteq(gteq) => {
+                            let callee = scope.get("Core:gteq")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Gteq { left, right, .. } = *gteq;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Eq(eq) => {
+                            let callee = scope.get("Core:eq")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Eq { left, right, .. } = *eq;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Neq(neq) => {
+                            let callee = scope.get("Core:neq")?;
+                            let callee = <VFn>::try_from(callee)?;
+                            let ast::Neq { left, right, .. } = *neq;
+                            stack.push(Frame::BinOp1 {
+                                callee,
+                                right: *right,
+                            });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::And(and) => {
+                            let ast::And { left, right, .. } = *and;
+                            stack.push(Frame::And1 { right: *right });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Or(or) => {
+                            let ast::Or { left, right, .. } = *or;
+                            stack.push(Frame::Or1 { right: *right });
+                            stack.eval(*left);
+                        }
+                        ast::Expression::Identifier(identifier) => {
+                            let value = scope.get(&identifier.name)?;
+                            value_stack.push(value);
+                        }
+                        ast::Expression::Call(call) => {
+                            let ast::Call { target, args, .. } = *call;
+                            stack.push(Frame::Call1 { args });
+                            stack.eval(*target);
+                        }
+                        ast::Expression::Index(index) => {
+                            let ast::Index { target, index, .. } = *index;
+                            stack.push(Frame::Index1 { index: *index });
+                            stack.eval(*target);
+                        }
+                        ast::Expression::Prop(prop) => {
+                            let ast::Prop { target, name, .. } = *prop;
+                            stack.push(Frame::Prop { name });
+                            stack.eval(*target);
+                        }
                     }
-                    ast::Expression::Tmpl(tmpl) => {
-                        let mut tmpl = tmpl.tmpl;
-                        tmpl.reverse();
-                        stack.push(Frame::Tmpl1 {
-                            tmpl,
-                            str: String::new(),
-                        });
-                    }
-                    ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
-                    ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
-                    ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
-                    ast::Expression::Null(_) => value_stack.push(Value::null()),
-                    ast::Expression::Obj(obj) => {
-                        let mut obj = obj.value;
-                        let len = obj.len();
-                        obj.reverse();
-                        stack.push(Frame::Obj1 {
-                            obj: obj.into(),
-                            value: IndexMap::with_capacity(len).into(),
-                        });
-                    }
-                    ast::Expression::Arr(arr) => {
-                        let mut arr = arr.value;
-                        let len = arr.len();
-                        arr.reverse();
-                        stack.push(Frame::Arr1 {
-                            arr,
-                            value: Vec::with_capacity(len),
-                        })
-                    }
-                    ast::Expression::Plus(plus) => {
-                        stack.push(Frame::Plus);
-                        stack.eval(*plus.expr);
-                    }
-                    ast::Expression::Minus(minus) => {
-                        stack.push(Frame::Minus);
-                        stack.eval(*minus.expr);
-                    }
-                    ast::Expression::Not(not) => {
-                        stack.push(Frame::Not);
-                        stack.eval(*not.expr);
-                    }
-                    ast::Expression::Pow(pow) => {
-                        let callee = scope.get("Core:pow")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Pow { left, right, .. } = *pow;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Mul(mul) => {
-                        let callee = scope.get("Core:mul")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Mul { left, right, .. } = *mul;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Div(div) => {
-                        let callee = scope.get("Core:div")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Div { left, right, .. } = *div;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Rem(rem) => {
-                        let callee = scope.get("Core:mod")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Rem { left, right, .. } = *rem;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Add(add) => {
-                        let callee = scope.get("Core:add")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Add { left, right, .. } = *add;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Sub(sub) => {
-                        let callee = scope.get("Core:sub")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Sub { left, right, .. } = *sub;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Lt(lt) => {
-                        let callee = scope.get("Core:lt")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Lt { left, right, .. } = *lt;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Lteq(lteq) => {
-                        let callee = scope.get("Core:lteq")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Lteq { left, right, .. } = *lteq;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Gt(gt) => {
-                        let callee = scope.get("Core:gt")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Gt { left, right, .. } = *gt;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Gteq(gteq) => {
-                        let callee = scope.get("Core:gteq")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Gteq { left, right, .. } = *gteq;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Eq(eq) => {
-                        let callee = scope.get("Core:eq")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Eq { left, right, .. } = *eq;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Neq(neq) => {
-                        let callee = scope.get("Core:neq")?;
-                        let callee = <VFn>::try_from(callee)?;
-                        let ast::Neq { left, right, .. } = *neq;
-                        stack.push(Frame::BinOp1 {
-                            callee,
-                            right: *right,
-                        });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::And(and) => {
-                        let ast::And { left, right, .. } = *and;
-                        stack.push(Frame::And1 { right: *right });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Or(or) => {
-                        let ast::Or { left, right, .. } = *or;
-                        stack.push(Frame::Or1 { right: *right });
-                        stack.eval(*left);
-                    }
-                    ast::Expression::Identifier(identifier) => {
-                        let value = scope.get(&identifier.name)?;
-                        value_stack.push(value);
-                    }
-                    ast::Expression::Call(call) => {
-                        let ast::Call { target, args, .. } = *call;
-                        stack.push(Frame::Call1 { args });
-                        stack.eval(*target);
-                    }
-                    ast::Expression::Index(index) => {
-                        let ast::Index { target, index, .. } = *index;
-                        stack.push(Frame::Index1 { index: *index });
-                        stack.eval(*target);
-                    }
-                    ast::Expression::Prop(prop) => {
-                        let ast::Prop { target, name, .. } = *prop;
-                        stack.push(Frame::Prop { name });
-                        stack.eval(*target);
-                    }
-                },
+                }
                 Frame::Definition { dest, mut_, attr } => {
                     let mut value = value_stack.pop_value()?;
                     if value.is_control() {
@@ -1655,17 +1677,6 @@ impl Interpreter {
                         }
                     } else if !keep {
                         value_stack.pop_value()?;
-                    }
-                }
-                Frame::Eval => {
-                    if self.stop.load(Ordering::Acquire) {
-                        return Ok(Value::null());
-                    }
-                    let step_count = self.step_count.fetch_add(1, Ordering::Relaxed);
-                    if let Some(max_step) = self.max_step
-                        && step_count > max_step
-                    {
-                        Err(AiScriptRuntimeError::MaxStepExceeded)?
                     }
                 }
             }
