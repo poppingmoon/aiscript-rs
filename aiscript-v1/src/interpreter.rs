@@ -496,7 +496,7 @@ impl Interpreter {
                                     Value::fn_(
                                         params,
                                         children.clone(),
-                                        scope.create_child_scope(HashMap::new()),
+                                        scope.clone().create_child_scope(HashMap::new()),
                                     )
                                 },
                             );

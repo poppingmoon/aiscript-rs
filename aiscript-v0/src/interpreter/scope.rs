@@ -31,9 +31,9 @@ impl Scope {
         }
     }
 
-    pub fn create_child_scope(&self, states: HashMap<String, Variable>) -> Self {
+    pub fn create_child_scope(self, states: HashMap<String, Variable>) -> Self {
         Scope {
-            parent: Some(self.clone().into()),
+            parent: Some(self.into()),
             states: Arc::new(RwLock::new(states)),
             ns_name: None,
         }
