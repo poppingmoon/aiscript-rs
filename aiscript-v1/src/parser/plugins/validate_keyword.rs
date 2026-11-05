@@ -53,6 +53,20 @@ const RESERVED_WORD: [&str; 39] = [
 struct KeywordValidator;
 
 impl Visitor for KeywordValidator {
+    fn visit_identifier(
+        &mut self,
+        identifier: ast::Identifier,
+    ) -> Result<ast::Identifier, AiScriptSyntaxError> {
+        if RESERVED_WORD.contains(&identifier.name.as_str()) {
+            Err(AiScriptSyntaxError {
+                kind: AiScriptSyntaxErrorKind::ReservedWord(identifier.name),
+                pos: identifier.loc.start,
+            })
+        } else {
+            Ok(identifier)
+        }
+    }
+
     fn callback_namespace(
         &mut self,
         namespace: ast::Namespace,
@@ -172,15 +186,6 @@ impl Visitor for KeywordValidator {
         expression: ast::Expression,
     ) -> Result<ast::Expression, AiScriptSyntaxError> {
         match expression {
-            ast::Expression::Identifier(identifier) => match *identifier {
-                ast::Identifier { loc, name } if RESERVED_WORD.contains(&name.as_str()) => {
-                    Err(AiScriptSyntaxError {
-                        kind: AiScriptSyntaxErrorKind::ReservedWord(name),
-                        pos: loc.start,
-                    })
-                }
-                _ => Ok(ast::Expression::Identifier(identifier)),
-            },
             ast::Expression::Fn(fn_) => {
                 let fn_ = *fn_;
                 let type_params = fn_

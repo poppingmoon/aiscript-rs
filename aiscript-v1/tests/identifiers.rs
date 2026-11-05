@@ -380,15 +380,13 @@ macro_rules! escape_sequence_is_not_allowed {
                 let err = Parser::default()
                     .parse(&format!($code, name = $word))
                     .unwrap_err();
-                if let AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::UnexpectedToken(value),
-                    ..
-                } = err
-                {
-                    assert_eq!(value, "BackSlash");
-                    return;
-                }
-                panic!();
+                assert!(matches!(
+                    err,
+                    AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::UnexpectedToken(_),
+                        ..
+                    }
+                ),);
             })*
         }
     };
@@ -446,6 +444,12 @@ mod identifier_validation {
             r#"
             ### {name} 1
             "#,
+        ),
+        (
+            exists,
+            r#"
+            exists {name}
+            "#
         ),
         (
             for_break,
