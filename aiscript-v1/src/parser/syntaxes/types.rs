@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     error::{AiScriptSyntaxError, AiScriptSyntaxErrorKind},
     node as ast,
@@ -90,25 +92,25 @@ fn parse_union_type(s: &mut Tokens) -> Result<ast::TypeSource, AiScriptSyntaxErr
 
     Ok(if let Token::Or { .. } = s.peek() {
         let start_pos = match &first {
-            ast::TypeSource::NamedTypeSource(ast::NamedTypeSource { loc, .. })
-            | ast::TypeSource::FnTypeSource(ast::FnTypeSource { loc, .. })
-            | ast::TypeSource::UnionTypeSource(ast::UnionTypeSource { loc, .. }) => {
-                loc.start.clone()
-            }
-        };
+            ast::TypeSource::NamedTypeSource(first) => &first.loc,
+            ast::TypeSource::FnTypeSource(first) => &first.loc,
+            ast::TypeSource::UnionTypeSource(first) => &first.loc,
+        }
+        .start
+        .clone();
 
         let mut inners = vec![first];
         loop {
             s.pop_token();
             inners.push(parse_union_type_inner(s)?);
             let Token::Or { .. } = s.peek() else {
-                break ast::TypeSource::UnionTypeSource(ast::UnionTypeSource {
+                break ast::TypeSource::UnionTypeSource(Arc::new(ast::UnionTypeSource {
                     loc: ast::Loc {
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
                     inners,
-                });
+                }));
             };
         }
     } else {
@@ -118,13 +120,13 @@ fn parse_union_type(s: &mut Tokens) -> Result<ast::TypeSource, AiScriptSyntaxErr
 
 fn parse_union_type_inner(s: &mut Tokens) -> Result<ast::TypeSource, AiScriptSyntaxError> {
     Ok(match s.pop_token() {
-        Token::At { pos, .. } => ast::TypeSource::FnTypeSource(parse_fn_type(pos, s)?),
+        Token::At { pos, .. } => ast::TypeSource::FnTypeSource(Arc::new(parse_fn_type(pos, s)?)),
         Token::Identifier { pos, value, .. } => {
-            ast::TypeSource::NamedTypeSource(parse_named_type(pos, value.to_string(), s)?)
+            ast::TypeSource::NamedTypeSource(Arc::new(parse_named_type(pos, value.to_string(), s)?))
         }
-        Token::NullKeyword { pos, .. } => {
-            ast::TypeSource::NamedTypeSource(parse_named_type(pos, "null".to_string(), s)?)
-        }
+        Token::NullKeyword { pos, .. } => ast::TypeSource::NamedTypeSource(Arc::new(
+            parse_named_type(pos, "null".to_string(), s)?,
+        )),
         Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
             kind: AiScriptSyntaxErrorKind::UnexpectedEof,
             pos,
@@ -212,7 +214,7 @@ fn parse_fn_type(
         },
         type_params,
         params,
-        result: result_type.into(),
+        result: result_type,
     })
 }
 
@@ -235,7 +237,7 @@ fn parse_named_type(
                 pos: token.into_pos(),
             })?,
         };
-        Some(inner.into())
+        Some(inner)
     } else {
         None
     };

@@ -61,8 +61,8 @@ impl From<Statement> for ast::Statement {
             Statement::Each(each) => ast::Statement::Each(ast::Each::from(*each).into()),
             Statement::For(for_) => ast::Statement::For(ast::For::from(*for_).into()),
             Statement::Loop(loop_) => ast::Statement::Loop(ast::Loop::from(*loop_).into()),
-            Statement::Break(break_) => ast::Statement::Break(break_),
-            Statement::Continue(continue_) => ast::Statement::Continue(continue_),
+            Statement::Break(break_) => ast::Statement::Break((*break_).into()),
+            Statement::Continue(continue_) => ast::Statement::Continue((*continue_).into()),
             Statement::Assign(assign) => ast::Statement::Assign(ast::Assign::from(*assign).into()),
             Statement::AddAssign(addassign) => {
                 ast::Statement::AddAssign(ast::AddAssign::from(*addassign).into())
@@ -231,7 +231,7 @@ impl From<Each> for ast::Each {
         ast::Each {
             var: val.var,
             items: val.items.into(),
-            for_: Box::new((*val.for_).into()),
+            for_: (*val.for_).into(),
             loc: val.loc,
         }
     }
@@ -254,7 +254,7 @@ impl From<For> for ast::For {
             from: val.from.map(Into::into),
             to: val.to.map(Into::into),
             times: val.times.map(Into::into),
-            for_: Box::new((*val.for_).into()),
+            for_: (*val.for_).into(),
             loc: val.loc,
         }
     }
@@ -336,7 +336,7 @@ pub struct Not {
 impl From<Not> for ast::Not {
     fn from(val: Not) -> Self {
         ast::Not {
-            expr: Box::new((*val.expr).into()),
+            expr: (*val.expr).into(),
             loc: val.loc,
         }
     }
@@ -354,8 +354,8 @@ pub struct And {
 impl From<And> for ast::And {
     fn from(val: And) -> Self {
         ast::And {
-            left: Box::new((*val.left).into()),
-            right: Box::new((*val.right).into()),
+            left: (*val.left).into(),
+            right: (*val.right).into(),
             operator_loc: val.operator_loc,
             loc: val.loc,
         }
@@ -374,8 +374,8 @@ pub struct Or {
 impl From<Or> for ast::Or {
     fn from(val: Or) -> Self {
         ast::Or {
-            left: Box::new((*val.left).into()),
-            right: Box::new((*val.right).into()),
+            left: (*val.left).into(),
+            right: (*val.right).into(),
             operator_loc: val.operator_loc,
             loc: val.loc,
         }
@@ -395,10 +395,10 @@ pub struct If {
 impl From<If> for ast::If {
     fn from(val: If) -> Self {
         ast::If {
-            cond: Box::new((*val.cond).into()),
-            then: Box::new((*val.then).into()),
+            cond: (*val.cond).into(),
+            then: (*val.then).into(),
             elseif: val.elseif.into_iter().map(Into::into).collect(),
-            else_: val.else_.map(|else_| Box::new((*else_).into())),
+            else_: val.else_.map(|else_| (*else_).into()),
             loc: val.loc,
         }
     }
@@ -451,9 +451,9 @@ pub struct Match {
 impl From<Match> for ast::Match {
     fn from(val: Match) -> Self {
         ast::Match {
-            about: Box::new((*val.about).into()),
+            about: (*val.about).into(),
             qs: val.qs.into_iter().map(Into::into).collect(),
-            default: val.default.map(|default| Box::new((*default).into())),
+            default: val.default.map(|default| (*default).into()),
             loc: val.loc,
         }
     }
@@ -674,7 +674,7 @@ pub struct Call {
 impl From<Call> for ast::Call {
     fn from(val: Call) -> Self {
         ast::Call {
-            target: Box::new((*val.target).into()),
+            target: (*val.target).into(),
             args: val.args.into_iter().map(Into::into).collect(),
             loc: val.loc,
         }
@@ -692,8 +692,8 @@ pub struct Index {
 impl From<Index> for ast::Index {
     fn from(val: Index) -> Self {
         Self {
-            target: Box::new((*val.target).into()),
-            index: Box::new((*val.index).into()),
+            target: (*val.target).into(),
+            index: (*val.index).into(),
             loc: val.loc,
         }
     }
@@ -710,7 +710,7 @@ pub struct Prop {
 impl From<Prop> for ast::Prop {
     fn from(val: Prop) -> Self {
         Self {
-            target: Box::new((*val.target).into()),
+            target: (*val.target).into(),
             name: val.name,
             loc: val.loc,
         }

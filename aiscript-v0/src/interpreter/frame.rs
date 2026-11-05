@@ -109,22 +109,22 @@ pub enum Frame {
     If {
         then: StatementOrExpression,
         elseif: Vec<Elseif>,
-        else_: Option<Box<StatementOrExpression>>,
+        else_: Option<StatementOrExpression>,
     },
     Match1 {
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Match2 {
         about: Value,
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Match3 {
         about: Value,
-        a: Box<StatementOrExpression>,
+        a: StatementOrExpression,
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Block,
     Tmpl1 {

@@ -133,7 +133,7 @@ pub enum Frame {
         label: Option<String>,
         then: StatementOrExpression,
         elseif: Vec<Elseif>,
-        else_: Option<Box<StatementOrExpression>>,
+        else_: Option<StatementOrExpression>,
     },
     If2 {
         label: Option<String>,
@@ -142,20 +142,20 @@ pub enum Frame {
     Match1 {
         label: Option<String>,
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Match2 {
         label: Option<String>,
         about: Value,
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Match3 {
         label: Option<String>,
         about: Value,
-        a: Box<StatementOrExpression>,
+        a: StatementOrExpression,
         qs: Vec<QA>,
-        default: Option<Box<StatementOrExpression>>,
+        default: Option<StatementOrExpression>,
     },
     Match4 {
         label: Option<String>,

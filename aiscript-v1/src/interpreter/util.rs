@@ -613,11 +613,11 @@ impl std::fmt::Display for ReprValue<'_> {
     }
 }
 
-pub fn node_to_value(node: ast::Expression) -> Option<Value> {
+pub fn node_to_value(node: &ast::Expression) -> Option<Value> {
     match node {
         ast::Expression::Arr(arr) => Some(Value::arr({
             let mut vec = Vec::new();
-            for node in arr.value {
+            for node in &arr.value {
                 if let Some(value) = node_to_value(node) {
                     vec.push(value);
                 }
@@ -629,14 +629,14 @@ pub fn node_to_value(node: ast::Expression) -> Option<Value> {
         ast::Expression::Num(num) => Some(Value::num(num.value)),
         ast::Expression::Obj(obj) => Some(Value::obj({
             let mut map = IndexMap::new();
-            for (k, v) in obj.value.into_iter() {
+            for (k, v) in &obj.value {
                 if let Some(value) = node_to_value(v) {
-                    map.insert(k, value);
+                    map.insert(k.clone(), value);
                 }
             }
             map
         })),
-        ast::Expression::Str(str) => Some(Value::str(str.value)),
+        ast::Expression::Str(str) => Some(Value::str(str.value.clone())),
         _ => None,
     }
 }

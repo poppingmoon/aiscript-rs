@@ -702,12 +702,12 @@ mod chain {
             .unwrap();
         let line = ast.remove(0);
         if let Node::Expression(Expression::Prop(prop)) = line {
-            let Prop { target, name, .. } = *prop;
+            let Prop { target, name, .. } = &*prop;
             assert_eq!(name, "c");
-            if let Expression::Prop(prop) = *target {
-                let Prop { target, name, .. } = *prop;
+            if let Expression::Prop(prop) = target {
+                let Prop { target, name, .. } = &**prop;
                 assert_eq!(name, "b");
-                if let Expression::Identifier(identifier) = *target {
+                if let Expression::Identifier(identifier) = target {
                     assert_eq!(identifier.name, "a");
                 } else {
                     panic!("{target:?}");
@@ -731,16 +731,16 @@ mod chain {
             .unwrap();
         let line = ast.remove(0);
         if let Node::Expression(Expression::Prop(prop)) = line {
-            let Prop { target, name, .. } = *prop;
+            let Prop { target, name, .. } = &*prop;
             assert_eq!(name, "b");
-            if let Expression::Index(index) = *target {
-                let Index { target, index, .. } = *index;
-                if let Expression::Identifier(identifier) = *target {
+            if let Expression::Index(index) = target {
+                let Index { target, index, .. } = &**index;
+                if let Expression::Identifier(identifier) = target {
                     assert_eq!(identifier.name, "a");
                 } else {
                     panic!("{target:?}");
                 }
-                if let Expression::Num(num) = *index {
+                if let Expression::Num(num) = index {
                     assert_eq!(num.value, 42.0);
                 } else {
                     panic!("{index:?}");
@@ -764,11 +764,11 @@ mod chain {
             .unwrap();
         let line = ast.remove(0);
         if let Node::Expression(Expression::Prop(prop)) = line {
-            let Prop { target, name, .. } = *prop;
+            let Prop { target, name, .. } = &*prop;
             assert_eq!(name, "bar");
-            if let Expression::Call(call) = *target {
-                let Call { target, args, .. } = *call;
-                if let Expression::Identifier(identifier) = *target {
+            if let Expression::Call(call) = target {
+                let Call { target, args, .. } = &**call;
+                if let Expression::Identifier(identifier) = target {
                     assert_eq!(identifier.name, "foo");
                     if let [Expression::Num(num_1), Expression::Num(num_2)] = &args[..] {
                         assert_eq!(num_1.value, 42.0);
@@ -798,18 +798,18 @@ mod chain {
             .unwrap();
         let line = ast.remove(0);
         if let Node::Expression(Expression::Prop(prop)) = line {
-            let Prop { target, name, .. } = *prop;
+            let Prop { target, name, .. } = &*prop;
             assert_eq!(name, "e");
-            if let Expression::Prop(prop) = *target {
-                let Prop { target, name, .. } = *prop;
+            if let Expression::Prop(prop) = target {
+                let Prop { target, name, .. } = &**prop;
                 assert_eq!(name, "d");
-                if let Expression::Prop(prop) = *target {
-                    let Prop { target, name, .. } = *prop;
+                if let Expression::Prop(prop) = target {
+                    let Prop { target, name, .. } = &**prop;
                     assert_eq!(name, "c");
-                    if let Expression::Prop(prop) = *target {
-                        let Prop { target, name, .. } = *prop;
+                    if let Expression::Prop(prop) = target {
+                        let Prop { target, name, .. } = &**prop;
                         assert_eq!(name, "b");
-                        if let Expression::Identifier(identifier) = *target {
+                        if let Expression::Identifier(identifier) = target {
                             assert_eq!(identifier.name, "a");
                         } else {
                             panic!("{target:?}");
@@ -839,25 +839,25 @@ mod chain {
             .unwrap();
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line.clone() {
-            let Prop { target, name, .. } = *prop;
+            let Prop { target, name, .. } = &*prop;
             assert_eq!(name, "d");
-            if let Expression::If(if_) = *target {
+            if let Expression::If(if_) = target {
                 let If {
                     cond, then, else_, ..
-                } = *if_;
-                if let Expression::Identifier(identifier) = *cond {
+                } = &**if_;
+                if let Expression::Identifier(identifier) = cond {
                     assert_eq!(identifier.name, "a");
                 } else {
                     panic!("{cond:?}");
                 }
-                if let StatementOrExpression::Expression(Expression::Identifier(identifier)) = *then
+                if let StatementOrExpression::Expression(Expression::Identifier(identifier)) = then
                 {
                     assert_eq!(identifier.name, "b");
                 } else {
                     panic!("{then:?}");
                 }
-                let else_ = *else_.unwrap();
-                if let StatementOrExpression::Expression(Expression::Identifier(identifier)) = else_
+                if let Some(StatementOrExpression::Expression(Expression::Identifier(identifier))) =
+                    else_
                 {
                     assert_eq!(identifier.name, "c");
                 } else {
@@ -1299,13 +1299,13 @@ mod attribute {
             )
             .unwrap();
         if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
-            let Definition { dest, attr, .. } = *definition.clone();
+            let Definition { dest, attr, .. } = &**definition;
             if let Expression::Identifier(identifier) = dest {
                 assert_eq!(identifier.name, "onReceived");
             } else {
                 panic!("{dest:?}");
             }
-            let attr = attr.unwrap();
+            let attr = attr.as_ref().unwrap();
             if let [
                 Attribute {
                     name,
@@ -1339,13 +1339,13 @@ mod attribute {
             )
             .unwrap();
         if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
-            let Definition { dest, attr, .. } = *definition.clone();
+            let Definition { dest, attr, .. } = &**definition;
             if let Expression::Identifier(identifier) = dest {
                 assert_eq!(identifier.name, "createNote");
             } else {
                 panic!("{dest:?}");
             }
-            let attr = attr.unwrap();
+            let attr = attr.as_ref().unwrap();
             if let [
                 Attribute {
                     name: name1,
@@ -1395,13 +1395,13 @@ mod attribute {
             )
             .unwrap();
         if let [Node::Statement(Statement::Definition(definition))] = &nodes[..] {
-            let Definition { dest, attr, .. } = *definition.clone();
+            let Definition { dest, attr, .. } = &**definition;
             if let Expression::Identifier(identifier) = dest {
                 assert_eq!(identifier.name, "data");
             } else {
                 panic!("{dest:?}");
             }
-            let attr = attr.unwrap();
+            let attr = attr.as_ref().unwrap();
             if let [
                 Attribute {
                     name,
@@ -1486,7 +1486,7 @@ mod location {
             )
             .unwrap();
         if let [Node::Expression(Expression::Tmpl(tmpl))] = &nodes[..] {
-            let Tmpl { loc, tmpl } = *tmpl.clone();
+            let Tmpl { loc, tmpl } = tmpl.as_ref().clone();
             assert_eq!(
                 loc,
                 Loc {

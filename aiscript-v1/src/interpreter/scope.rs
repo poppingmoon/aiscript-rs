@@ -171,13 +171,13 @@ impl Scope {
 
     pub fn define(
         &self,
-        dest: Expression,
+        dest: &Expression,
         value: Value,
         is_mutable: bool,
     ) -> Result<(), AiScriptError> {
         match dest {
             Expression::Identifier(identifier) => self.add(
-                identifier.name,
+                identifier.name.clone(),
                 if is_mutable {
                     Variable::Mut(value)
                 } else {
@@ -186,7 +186,7 @@ impl Scope {
             ),
             Expression::Arr(arr) => {
                 let value = <Vec<Value>>::try_from(value)?;
-                for (index, item) in arr.value.into_iter().enumerate() {
+                for (index, item) in arr.value.iter().enumerate() {
                     self.define(
                         item,
                         value.get(index).cloned().unwrap_or_default(),
@@ -197,10 +197,10 @@ impl Scope {
             }
             Expression::Obj(obj) => {
                 let value = <IndexMap<String, Value>>::try_from(value)?;
-                for (key, item) in obj.value {
+                for (key, item) in &obj.value {
                     self.define(
                         item,
-                        value.get(&key).cloned().unwrap_or_default(),
+                        value.get(key).cloned().unwrap_or_default(),
                         is_mutable,
                     )?;
                 }

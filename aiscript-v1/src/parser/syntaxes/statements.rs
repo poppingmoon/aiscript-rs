@@ -292,8 +292,7 @@ fn parse_out(s: &mut Tokens) -> Result<ast::Call, AiScriptSyntaxError> {
                 name: "print".to_string(),
             }
             .into(),
-        )
-        .into(),
+        ),
         args: vec![expr],
     })
 }
@@ -320,28 +319,36 @@ pub fn parse_statement_with_label(
             ast::StatementOrExpression::Expression(match expression {
                 ast::Expression::If(if_) => ast::Expression::If(
                     ast::If {
+                        loc: if_.loc.clone(),
                         label: Some(label),
-                        ..*if_
+                        cond: if_.cond.clone(),
+                        then: if_.then.clone(),
+                        elseif: if_.elseif.clone(),
+                        else_: if_.else_.clone(),
                     }
                     .into(),
                 ),
                 ast::Expression::Match(match_) => ast::Expression::Match(
                     ast::Match {
+                        loc: match_.loc.clone(),
                         label: Some(label),
-                        ..*match_
+                        about: match_.about.clone(),
+                        qs: match_.qs.clone(),
+                        default: match_.default.clone(),
                     }
                     .into(),
                 ),
                 ast::Expression::Block(block) => ast::Expression::Block(
                     ast::Block {
+                        loc: block.loc.clone(),
                         label: Some(label),
-                        ..*block
+                        statements: block.statements.clone(),
                     }
                     .into(),
                 ),
                 _ => Err(AiScriptSyntaxError {
                     kind: AiScriptSyntaxErrorKind::InvalidStatementWithLabel,
-                    pos: expression.into_loc().start,
+                    pos: expression.loc().start.clone(),
                 })?,
             })
         }
@@ -349,35 +356,45 @@ pub fn parse_statement_with_label(
             ast::StatementOrExpression::Statement(match statement {
                 ast::Statement::Each(each) => ast::Statement::Each(
                     ast::Each {
+                        loc: each.loc.clone(),
                         label: Some(label),
-                        ..*each
+                        var: each.var.clone(),
+                        items: each.items.clone(),
+                        for_: each.for_.clone(),
                     }
                     .into(),
                 ),
                 ast::Statement::For(for_) => ast::Statement::For(
                     ast::For {
+                        loc: for_.loc.clone(),
                         label: Some(label),
-                        ..*for_
+                        times: for_.times.clone(),
+                        for_: for_.for_.clone(),
                     }
                     .into(),
                 ),
                 ast::Statement::ForLet(for_let) => ast::Statement::ForLet(
                     ast::ForLet {
+                        loc: for_let.loc.clone(),
                         label: Some(label),
-                        ..*for_let
+                        var: for_let.var.clone(),
+                        from: for_let.from.clone(),
+                        to: for_let.to.clone(),
+                        for_: for_let.for_.clone(),
                     }
                     .into(),
                 ),
                 ast::Statement::Loop(loop_) => ast::Statement::Loop(
                     ast::Loop {
+                        loc: loop_.loc.clone(),
                         label: Some(label),
-                        ..*loop_
+                        statements: loop_.statements.clone(),
                     }
                     .into(),
                 ),
                 _ => Err(AiScriptSyntaxError {
                     kind: AiScriptSyntaxErrorKind::InvalidStatementWithLabel,
-                    pos: statement.into_loc().start,
+                    pos: statement.loc().start.clone(),
                 })?,
             })
         }
@@ -452,7 +469,7 @@ fn parse_each(s: &mut Tokens) -> Result<ast::Each, AiScriptSyntaxError> {
         label: None,
         var: dest,
         items,
-        for_: body.into(),
+        for_: body,
     })
 }
 
@@ -543,7 +560,7 @@ fn parse_for(s: &mut Tokens) -> Result<ast::Statement, AiScriptSyntaxError> {
                 var: name.to_string(),
                 from,
                 to,
-                for_: body.into(),
+                for_: body,
             }
             .into(),
         )
@@ -574,7 +591,7 @@ fn parse_for(s: &mut Tokens) -> Result<ast::Statement, AiScriptSyntaxError> {
                 },
                 label: None,
                 times,
-                for_: body.into(),
+                for_: body,
             }
             .into(),
         )
@@ -625,17 +642,20 @@ pub fn parse_statement_with_attr(s: &mut Tokens) -> Result<ast::Definition, AiSc
 
     if let ast::StatementOrExpression::Statement(ast::Statement::Definition(definition)) = statement
     {
-        let definition = *definition;
-        let mut attr = definition.attr.unwrap_or_default();
+        let mut attr = definition.attr.clone().unwrap_or_default();
         attr.extend(attrs);
         Ok(ast::Definition {
+            loc: definition.loc.clone(),
             attr: Some(attr),
-            ..definition
+            dest: definition.dest.clone(),
+            var_type: definition.var_type.clone(),
+            expr: definition.expr.clone(),
+            mut_: definition.mut_,
         })
     } else {
         Err(AiScriptSyntaxError {
             kind: AiScriptSyntaxErrorKind::InvalidAttribute,
-            pos: statement.into_loc().start,
+            pos: statement.loc().start.clone(),
         })
     }
 }
@@ -775,11 +795,10 @@ fn parse_do_while(s: &mut Tokens) -> Result<ast::Loop, AiScriptSyntaxError> {
                                 start: while_pos,
                                 end: end_pos.clone(),
                             },
-                            expr: cond.into(),
+                            expr: cond,
                         }
                         .into(),
-                    )
-                    .into(),
+                    ),
                     then: ast::StatementOrExpression::Statement(ast::Statement::Break(
                         ast::Break {
                             loc: ast::Loc {
@@ -790,8 +809,7 @@ fn parse_do_while(s: &mut Tokens) -> Result<ast::Loop, AiScriptSyntaxError> {
                             expr: None,
                         }
                         .into(),
-                    ))
-                    .into(),
+                    )),
                     elseif: Vec::new(),
                     else_: None,
                 }
@@ -838,11 +856,10 @@ fn parse_while(s: &mut Tokens) -> Result<ast::Loop, AiScriptSyntaxError> {
                                 start: start_pos,
                                 end: cond_end_pos.clone(),
                             },
-                            expr: cond.into(),
+                            expr: cond,
                         }
                         .into(),
-                    )
-                    .into(),
+                    ),
                     then: ast::StatementOrExpression::Statement(ast::Statement::Break(
                         ast::Break {
                             loc: ast::Loc {
@@ -853,8 +870,7 @@ fn parse_while(s: &mut Tokens) -> Result<ast::Loop, AiScriptSyntaxError> {
                             expr: None,
                         }
                         .into(),
-                    ))
-                    .into(),
+                    )),
                     elseif: Vec::new(),
                     else_: None,
                 }

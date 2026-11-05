@@ -165,11 +165,11 @@ impl Interpreter {
     }
 
     pub fn collect_metadata(script: Vec<ast::Node>) -> IndexMap<Option<String>, Option<Value>> {
-        fn node_to_value(node: ast::Expression) -> Option<Value> {
+        fn node_to_value(node: &ast::Expression) -> Option<Value> {
             match node {
                 ast::Expression::Arr(arr) => Some(Value::arr({
                     let mut vec = Vec::new();
-                    for node in arr.value {
+                    for node in &arr.value {
                         if let Some(value) = node_to_value(node) {
                             vec.push(value);
                         }
@@ -181,14 +181,14 @@ impl Interpreter {
                 ast::Expression::Num(num) => Some(Value::num(num.value)),
                 ast::Expression::Obj(obj) => Some(Value::obj({
                     let mut map = IndexMap::new();
-                    for (k, v) in obj.value.into_iter() {
+                    for (k, v) in &obj.value {
                         if let Some(value) = node_to_value(v) {
                             map.insert(k, value);
                         }
                     }
                     map
                 })),
-                ast::Expression::Str(str) => Some(Value::str(str.value)),
+                ast::Expression::Str(str) => Some(Value::str(str.value.clone())),
                 _ => None,
             }
         }
@@ -197,7 +197,7 @@ impl Interpreter {
 
         for node in script {
             if let ast::Node::Meta(m) = node {
-                meta.insert(m.name, node_to_value(m.value));
+                meta.insert(m.name.clone(), node_to_value(&m.value));
             }
         }
 
@@ -233,7 +233,7 @@ impl Interpreter {
             match node.into() {
                 ast::Node::Namespace(namespace) => {
                     let loc = namespace.loc.clone();
-                    self.collect_ns_member(*namespace, scope.clone()).await?;
+                    self.collect_ns_member(&namespace, scope).await?;
                     nodes.push(ast::StatementOrExpression::Expression(
                         ast::Expression::Null(ast::Null { loc }.into()),
                     ))
@@ -245,27 +245,31 @@ impl Interpreter {
                     nodes.push(ast::StatementOrExpression::Expression(expression))
                 }
                 ast::Node::Meta(meta) => nodes.push(ast::StatementOrExpression::Expression(
-                    ast::Expression::Null(ast::Null { loc: meta.loc }.into()),
+                    ast::Expression::Null(
+                        ast::Null {
+                            loc: meta.loc.clone(),
+                        }
+                        .into(),
+                    ),
                 )),
             }
         }
         Ok(nodes)
     }
 
-    fn collect_ns_member(
-        &self,
-        ns: ast::Namespace,
-        scope: Scope,
-    ) -> BoxFuture<'_, Result<(), AiScriptError>> {
+    fn collect_ns_member<'a>(
+        &'a self,
+        ns: &'a ast::Namespace,
+        scope: &'a Scope,
+    ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
-            let ns_scope = scope.create_child_namespace_scope(ns.name, HashMap::new());
+            let ns_scope = scope.create_child_namespace_scope(ns.name.clone(), HashMap::new());
             for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Namespace(ns) = node {
-                    self.collect_ns_member(*ns.clone(), ns_scope.clone())
-                        .await?;
+                    self.collect_ns_member(ns, &ns_scope).await?;
                 }
             }
-            for node in ns.members {
+            for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Definition(definition) = node {
                     if definition.mut_ {
                         Err(AiScriptError::internal(format!(
@@ -273,8 +277,9 @@ impl Interpreter {
                             definition.name,
                         )))?;
                     } else {
-                        let variable =
-                            Variable::Const(self.run(vec![definition.expr], &ns_scope).await?);
+                        let variable = Variable::Const(
+                            self.run(vec![definition.expr.clone()], &ns_scope).await?,
+                        );
                         ns_scope.add(&definition.name, variable)?;
                     }
                 }
@@ -339,64 +344,68 @@ impl Interpreter {
                     match statement {
                         ast::Statement::Definition(definition) => {
                             stack.push(Frame::Definition {
-                                name: definition.name,
+                                name: definition.name.clone(),
                                 mut_: definition.mut_,
                             });
-                            stack.eval(definition.expr);
+                            stack.eval(definition.expr.clone());
                         }
                         ast::Statement::Return(return_) => {
                             stack.push(Frame::Return);
-                            stack.eval(return_.expr);
+                            stack.eval(return_.expr.clone());
                         }
                         ast::Statement::Each(each) => {
                             stack.push(Frame::Each1 {
-                                var: each.var,
-                                for_: *each.for_,
+                                var: each.var.clone(),
+                                for_: each.for_.clone(),
                             });
-                            stack.eval(each.items);
+                            stack.eval(each.items.clone());
                         }
                         ast::Statement::For(for_) => {
-                            if let Some(times) = for_.times {
-                                stack.push(Frame::For1 { for_: *for_.for_ });
-                                stack.eval(times);
+                            if let Some(times) = &for_.times {
+                                stack.push(Frame::For1 {
+                                    for_: for_.for_.clone(),
+                                });
+                                stack.eval(times.clone());
                             } else if let ast::For {
                                 var: Some(var),
                                 from: Some(from),
                                 to: Some(to),
                                 for_,
                                 ..
-                            } = *for_
+                            } = &*for_
                             {
                                 stack.push(Frame::ForLet1 {
-                                    var,
-                                    to,
-                                    for_: *for_,
+                                    var: var.clone(),
+                                    to: to.clone(),
+                                    for_: (*for_).clone(),
                                 });
-                                stack.eval(from);
+                                stack.eval(from.clone());
                             }
                         }
                         ast::Statement::Loop(loop_) => stack.push(Frame::Loop1 {
-                            statements: loop_.statements,
+                            statements: loop_.statements.clone(),
                         }),
                         ast::Statement::Break(_) => value_stack.push(Value::break_()),
                         ast::Statement::Continue(_) => value_stack.push(Value::continue_()),
                         ast::Statement::Assign(assign) => {
-                            stack.push(Frame::Assign1 { dest: assign.dest });
-                            stack.eval(assign.expr);
+                            stack.push(Frame::Assign1 {
+                                dest: assign.dest.clone(),
+                            });
+                            stack.eval(assign.expr.clone());
                         }
                         ast::Statement::AddAssign(add_assign) => {
                             stack.push(Frame::AddAssign1 {
                                 dest: add_assign.dest.clone(),
-                                expr: add_assign.expr,
+                                expr: add_assign.expr.clone(),
                             });
-                            stack.eval(add_assign.dest);
+                            stack.eval(add_assign.dest.clone());
                         }
                         ast::Statement::SubAssign(sub_assign) => {
                             stack.push(Frame::SubAssign1 {
                                 dest: sub_assign.dest.clone(),
-                                expr: sub_assign.expr,
+                                expr: sub_assign.expr.clone(),
                             });
-                            stack.eval(sub_assign.dest);
+                            stack.eval(sub_assign.dest.clone());
                         }
                     }
                 }
@@ -412,53 +421,55 @@ impl Interpreter {
                     }
                     match expression {
                         ast::Expression::If(if_) => {
-                            let mut elseif = if_.elseif;
+                            let mut elseif = if_.elseif.clone();
                             elseif.reverse();
                             stack.push(Frame::If {
-                                then: *if_.then,
+                                then: if_.then.clone(),
                                 elseif,
-                                else_: if_.else_,
+                                else_: if_.else_.clone(),
                             });
-                            stack.eval(*if_.cond);
+                            stack.eval(if_.cond.clone());
                         }
                         ast::Expression::Fn(fn_) => {
                             let scope = scope.clone();
                             value_stack.push(Value::fn_(
-                                fn_.args.into_iter().map(|arg| arg.name),
-                                fn_.children,
+                                fn_.args.clone().into_iter().map(|arg| arg.name),
+                                fn_.children.clone(),
                                 scope.into(),
                             ));
                         }
                         ast::Expression::Match(match_) => {
                             stack.push(Frame::Match1 {
-                                qs: match_.qs,
-                                default: match_.default,
+                                qs: match_.qs.clone(),
+                                default: match_.default.clone(),
                             });
-                            stack.eval(*match_.about);
+                            stack.eval(match_.about.clone());
                         }
                         ast::Expression::Block(block) => {
                             scope = scope.create_child_scope(HashMap::new());
                             stack.push(Frame::Block);
-                            stack.run(block.statements);
+                            stack.run(block.statements.clone());
                         }
                         ast::Expression::Exists(exists) => {
                             let exists = scope.exists(&exists.identifier.name)?;
                             value_stack.push(Value::bool(exists));
                         }
                         ast::Expression::Tmpl(tmpl) => {
-                            let mut tmpl = tmpl.tmpl;
+                            let mut tmpl = tmpl.tmpl.clone();
                             tmpl.reverse();
                             stack.push(Frame::Tmpl1 {
                                 tmpl,
                                 str: String::new(),
                             });
                         }
-                        ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
+                        ast::Expression::Str(str) => {
+                            value_stack.push(Value::str(str.value.clone()))
+                        }
                         ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
                         ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
                         ast::Expression::Null(_) => value_stack.push(Value::null()),
                         ast::Expression::Obj(obj) => {
-                            let mut obj = obj.value;
+                            let mut obj = obj.value.clone();
                             obj.reverse();
                             stack.push(Frame::Obj1 {
                                 obj: obj.into(),
@@ -468,6 +479,7 @@ impl Interpreter {
                         ast::Expression::Arr(arr) => {
                             let arr = try_join_all(
                                 arr.value
+                                    .clone()
                                     .into_iter()
                                     .map(|expr| self.run(vec![expr], &scope)),
                             )
@@ -476,33 +488,41 @@ impl Interpreter {
                         }
                         ast::Expression::Not(not) => {
                             stack.push(Frame::Not);
-                            stack.eval(*not.expr);
+                            stack.eval(not.expr.clone());
                         }
                         ast::Expression::And(and) => {
-                            stack.push(Frame::And1 { right: *and.right });
-                            stack.eval(*and.left);
+                            stack.push(Frame::And1 {
+                                right: and.right.clone(),
+                            });
+                            stack.eval(and.left.clone());
                         }
                         ast::Expression::Or(or) => {
-                            stack.push(Frame::Or1 { right: *or.right });
-                            stack.eval(*or.left);
+                            stack.push(Frame::Or1 {
+                                right: or.right.clone(),
+                            });
+                            stack.eval(or.left.clone());
                         }
                         ast::Expression::Identifier(identifier) => {
                             let value = scope.get(&identifier.name)?;
                             value_stack.push(value);
                         }
                         ast::Expression::Call(call) => {
-                            stack.push(Frame::Call1 { args: call.args });
-                            stack.eval(*call.target);
+                            stack.push(Frame::Call1 {
+                                args: call.args.clone(),
+                            });
+                            stack.eval(call.target.clone());
                         }
                         ast::Expression::Index(index) => {
                             stack.push(Frame::Index1 {
-                                index: *index.index,
+                                index: index.index.clone(),
                             });
-                            stack.eval(*index.target);
+                            stack.eval(index.target.clone());
                         }
                         ast::Expression::Prop(prop) => {
-                            stack.push(Frame::Prop { name: prop.name });
-                            stack.eval(*prop.target);
+                            stack.push(Frame::Prop {
+                                name: prop.name.clone(),
+                            });
+                            stack.eval(prop.target.clone());
                         }
                     }
                 }
@@ -672,35 +692,37 @@ impl Interpreter {
                     }
                     ast::Expression::Index(index) => {
                         stack.push(Frame::AssignIndex1 {
-                            index: *index.index,
+                            index: index.index.clone(),
                             value,
                         });
-                        stack.eval(*index.target);
+                        stack.eval(index.target.clone());
                     }
                     ast::Expression::Prop(prop) => {
                         stack.push(Frame::AssignProp {
-                            name: prop.name,
+                            name: prop.name.clone(),
                             value,
                         });
-                        stack.eval(*prop.target);
+                        stack.eval(prop.target.clone());
                     }
                     ast::Expression::Arr(arr) => {
                         let value = <Vec<Value>>::try_from(value)?;
-                        try_join_all(arr.value.into_iter().enumerate().map(|(index, item)| {
-                            self.run(
-                                vec![Frame::Assign2 {
-                                    dest: item,
-                                    value: value.get(index).cloned().unwrap_or_default(),
-                                }],
-                                &scope,
-                            )
-                        }))
+                        try_join_all(arr.value.clone().into_iter().enumerate().map(
+                            |(index, item)| {
+                                self.run(
+                                    vec![Frame::Assign2 {
+                                        dest: item,
+                                        value: value.get(index).cloned().unwrap_or_default(),
+                                    }],
+                                    &scope,
+                                )
+                            },
+                        ))
                         .await?;
                         value_stack.push(Value::null());
                     }
                     ast::Expression::Obj(obj) => {
                         let value = <IndexMap<String, Value>>::try_from(value)?;
-                        try_join_all(obj.value.into_iter().map(|(key, item)| {
+                        try_join_all(obj.value.clone().into_iter().map(|(key, item)| {
                             self.run(
                                 vec![Frame::Assign2 {
                                     dest: item,
@@ -811,7 +833,7 @@ impl Interpreter {
                         });
                         stack.eval(cond);
                     } else if let Some(else_) = else_ {
-                        stack.eval(*else_);
+                        stack.eval(else_.clone());
                     } else {
                         value_stack.push(Value::null());
                     }
@@ -829,13 +851,13 @@ impl Interpreter {
                     if let Some(ast::QA { q, a }) = qs.pop() {
                         stack.push(Frame::Match3 {
                             about,
-                            a: a.into(),
+                            a,
                             qs,
                             default,
                         });
                         stack.eval(q);
                     } else if let Some(default) = default {
-                        stack.eval(*default);
+                        stack.eval(default.clone());
                     } else {
                         value_stack.push(Value::null());
                     }
@@ -848,7 +870,7 @@ impl Interpreter {
                 } => {
                     let q = value_stack.pop_value()?;
                     if about == q {
-                        stack.eval(*a);
+                        stack.eval(a);
                     } else {
                         stack.push(Frame::Match2 { about, qs, default });
                     }

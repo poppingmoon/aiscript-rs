@@ -42,26 +42,26 @@ impl Display for ast::TypeSource {
     }
 }
 
-impl TryFrom<ast::TypeSource> for Type {
+impl TryFrom<&ast::TypeSource> for Type {
     type Error = AiScriptSyntaxError;
 
-    fn try_from(value: ast::TypeSource) -> Result<Self, Self::Error> {
+    fn try_from(value: &ast::TypeSource) -> Result<Self, Self::Error> {
         match value {
             ast::TypeSource::NamedTypeSource(type_source) => match type_source.name.as_str() {
                 "null" | "bool" | "num" | "str" | "any" | "void" => Ok(Type::Simple),
                 "arr" | "obj" => {
-                    if let Some(inner) = type_source.inner {
-                        Type::try_from(*inner)?;
+                    if let Some(inner) = &type_source.inner {
+                        Type::try_from(inner)?;
                     }
                     Ok(Type::Generic)
                 }
                 _ => Err(AiScriptSyntaxError::unknown_type(type_source)),
             },
-            ast::TypeSource::FnTypeSource(ast::FnTypeSource { args, result, .. }) => {
-                for arg in args {
+            ast::TypeSource::FnTypeSource(fn_type_source) => {
+                for arg in &fn_type_source.args {
                     Type::try_from(arg)?;
                 }
-                Type::try_from(*result)?;
+                Type::try_from(&fn_type_source.result)?;
                 Ok(Type::Fn)
             }
         }

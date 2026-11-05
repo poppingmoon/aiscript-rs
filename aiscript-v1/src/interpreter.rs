@@ -168,7 +168,7 @@ impl Interpreter {
 
         for node in script {
             if let ast::Node::Meta(m) = node {
-                meta.insert(m.name, node_to_value(m.value));
+                meta.insert(m.name.clone(), node_to_value(&m.value));
             }
         }
 
@@ -204,7 +204,7 @@ impl Interpreter {
             match node {
                 ast::Node::Namespace(namespace) => {
                     let loc = namespace.loc.clone();
-                    self.collect_ns_member(*namespace, scope.clone()).await?;
+                    self.collect_ns_member(&namespace, scope).await?;
                     nodes.push(ast::StatementOrExpression::Expression(
                         ast::Expression::Null(ast::Null { loc }.into()),
                     ))
@@ -216,54 +216,59 @@ impl Interpreter {
                     nodes.push(ast::StatementOrExpression::Expression(expression))
                 }
                 ast::Node::Meta(meta) => nodes.push(ast::StatementOrExpression::Expression(
-                    ast::Expression::Null(ast::Null { loc: meta.loc }.into()),
+                    ast::Expression::Null(
+                        ast::Null {
+                            loc: meta.loc.clone(),
+                        }
+                        .into(),
+                    ),
                 )),
             }
         }
         Ok(nodes)
     }
 
-    fn collect_ns_member(
-        &self,
-        ns: ast::Namespace,
-        scope: Scope,
-    ) -> BoxFuture<'_, Result<(), AiScriptError>> {
+    fn collect_ns_member<'a>(
+        &'a self,
+        ns: &'a ast::Namespace,
+        scope: &'a Scope,
+    ) -> BoxFuture<'a, Result<(), AiScriptError>> {
         async move {
-            let ns_scope = scope.create_child_namespace_scope(ns.name, HashMap::new());
+            let ns_scope = scope.create_child_namespace_scope(ns.name.clone(), HashMap::new());
             for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Namespace(ns) = node {
-                    self.collect_ns_member(*ns.clone(), ns_scope.clone())
-                        .await?;
+                    self.collect_ns_member(ns, &ns_scope).await?;
                 }
             }
-            for node in ns.members {
+            for node in &ns.members {
                 if let ast::DefinitionOrNamespace::Definition(definition) = node {
-                    if let ast::Expression::Identifier(identifier) = definition.dest {
+                    if let ast::Expression::Identifier(identifier) = &definition.dest {
                         if definition.mut_ {
                             Err(AiScriptNamespaceError {
-                                kind: AiScriptNamespaceErrorKind::Mutable(identifier.name),
-                                pos: definition.loc.start,
+                                kind: AiScriptNamespaceErrorKind::Mutable(identifier.name.clone()),
+                                pos: definition.loc.start.clone(),
                             })?;
                         } else {
-                            let mut value = self.run(vec![definition.expr], &ns_scope).await?;
+                            let mut value =
+                                self.run(vec![definition.expr.clone()], &ns_scope).await?;
 
-                            value.attr = definition.attr.map(|attr| {
-                                attr.into_iter()
+                            value.attr = definition.attr.as_ref().map(|attr| {
+                                attr.iter()
                                     .filter_map(|attr| {
-                                        node_to_value(attr.value).map(|value| Attr {
-                                            name: attr.name,
+                                        node_to_value(&attr.value).map(|value| Attr {
+                                            name: attr.name.clone(),
                                             value,
                                         })
                                     })
                                     .collect()
                             });
 
-                            ns_scope.add(identifier.name, Variable::Const(value))?;
+                            ns_scope.add(identifier.name.clone(), Variable::Const(value))?;
                         }
                     } else {
                         Err(AiScriptNamespaceError {
                             kind: AiScriptNamespaceErrorKind::DestructuringAssignment,
-                            pos: definition.dest.into_loc().start,
+                            pos: definition.dest.loc().start.clone(),
                         })?
                     }
                 }
@@ -287,7 +292,7 @@ impl Interpreter {
                 let fn_scope = scope.create_child_scope(HashMap::new());
                 for (param, arg) in zip(params, args.into_iter().map(Some).chain(repeat(None))) {
                     let result = expect_any(arg.or(param.default))
-                        .and_then(|arg| fn_scope.define(param.dest, arg, true));
+                        .and_then(|arg| fn_scope.define(&param.dest, arg, true));
                     if let Err(e) = result {
                         return async { Err(e) }.boxed();
                     }
@@ -333,13 +338,13 @@ impl Interpreter {
                                 mut_,
                                 attr,
                                 ..
-                            } = *definition;
+                            } = (*definition).clone();
                             stack.push(Frame::Definition { dest, mut_, attr });
                             stack.eval(expr);
                         }
                         ast::Statement::Return(return_) => {
                             stack.push(Frame::Return);
-                            stack.eval(return_.expr);
+                            stack.eval(return_.expr.clone());
                         }
                         ast::Statement::Each(each) => {
                             let ast::Each {
@@ -348,20 +353,23 @@ impl Interpreter {
                                 items,
                                 for_,
                                 ..
-                            } = *each;
+                            } = &*each;
                             stack.push(Frame::Each1 {
-                                label,
-                                var,
-                                for_: *for_,
+                                label: label.clone(),
+                                var: var.clone(),
+                                for_: for_.clone(),
                             });
-                            stack.eval(items);
+                            stack.eval(items.clone());
                         }
                         ast::Statement::For(for_) => {
                             let ast::For {
                                 label, times, for_, ..
-                            } = *for_;
-                            stack.push(Frame::For1 { label, for_: *for_ });
-                            stack.eval(times);
+                            } = &*for_;
+                            stack.push(Frame::For1 {
+                                label: label.clone(),
+                                for_: for_.clone(),
+                            });
+                            stack.eval(times.clone());
                         }
                         ast::Statement::ForLet(for_let) => {
                             let ast::ForLet {
@@ -371,56 +379,61 @@ impl Interpreter {
                                 to,
                                 for_,
                                 ..
-                            } = *for_let;
+                            } = &*for_let;
                             stack.push(Frame::ForLet1 {
-                                label,
-                                var,
-                                to,
-                                for_: *for_,
+                                label: label.clone(),
+                                var: var.clone(),
+                                to: to.clone(),
+                                for_: for_.clone(),
                             });
-                            stack.eval(from);
+                            stack.eval(from.clone());
                         }
                         ast::Statement::Loop(loop_) => {
                             let ast::Loop {
                                 label, statements, ..
-                            } = *loop_;
-                            stack.push(Frame::Loop1 { label, statements })
+                            } = &*loop_;
+                            stack.push(Frame::Loop1 {
+                                label: label.clone(),
+                                statements: statements.clone(),
+                            })
                         }
                         ast::Statement::Break(break_) => {
-                            let ast::Break { label, expr, .. } = *break_;
+                            let ast::Break { label, expr, .. } = &*break_;
                             if let Some(expr) = expr {
-                                stack.push(Frame::Break { label });
-                                stack.eval(expr);
+                                stack.push(Frame::Break {
+                                    label: label.clone(),
+                                });
+                                stack.eval(expr.clone());
                             } else {
-                                value_stack.push(Value::break_(label, None));
+                                value_stack.push(Value::break_(label.clone(), None))
                             }
                         }
                         ast::Statement::Continue(continue_) => {
-                            value_stack.push(Value::continue_(continue_.label))
+                            value_stack.push(Value::continue_(continue_.label.clone()))
                         }
                         ast::Statement::Assign(assign) => {
-                            let ast::Assign { dest, expr, .. } = *assign;
+                            let ast::Assign { dest, expr, .. } = &*assign;
                             stack.push(Frame::Assign {
-                                dest,
-                                expr: Some(expr),
+                                dest: dest.clone(),
+                                expr: Some(expr.clone()),
                                 op: None,
                             });
                             value_stack.push(Value::null());
                         }
                         ast::Statement::AddAssign(add_assign) => {
-                            let ast::AddAssign { dest, expr, .. } = *add_assign;
+                            let ast::AddAssign { dest, expr, .. } = &*add_assign;
                             stack.push(Frame::Assign {
-                                dest,
-                                expr: Some(expr),
+                                dest: dest.clone(),
+                                expr: Some(expr.clone()),
                                 op: Some(AssignmentOperator::Add),
                             });
                             value_stack.push(Value::null());
                         }
                         ast::Statement::SubAssign(sub_assign) => {
-                            let ast::SubAssign { dest, expr, .. } = *sub_assign;
+                            let ast::SubAssign { dest, expr, .. } = &*sub_assign;
                             stack.push(Frame::Assign {
-                                dest,
-                                expr: Some(expr),
+                                dest: dest.clone(),
+                                expr: Some(expr.clone()),
                                 op: Some(AssignmentOperator::Sub),
                             });
                             value_stack.push(Value::null());
@@ -443,27 +456,28 @@ impl Interpreter {
                                 label,
                                 cond,
                                 then,
-                                mut elseif,
-                                else_,
-                                ..
-                            } = *if_;
-                            elseif.reverse();
-                            stack.push(Frame::If1 {
-                                label,
-                                then: *then,
                                 elseif,
                                 else_,
+                                ..
+                            } = &*if_;
+                            let mut elseif = elseif.clone();
+                            elseif.reverse();
+                            stack.push(Frame::If1 {
+                                label: label.clone(),
+                                then: then.clone(),
+                                elseif,
+                                else_: else_.clone(),
                             });
-                            stack.eval(*cond);
+                            stack.eval(cond.clone());
                         }
                         ast::Expression::Fn(fn_) => {
                             let ast::Fn {
                                 params, children, ..
-                            } = *fn_;
-                            let params = try_join_all(params.into_iter().map(async |param| {
+                            } = &*fn_;
+                            let params = try_join_all(params.iter().map(async |param| {
                                 Ok::<VFnParam, AiScriptError>(VFnParam {
-                                    dest: param.dest,
-                                    default: if let Some(default) = param.default {
+                                    dest: param.dest.clone(),
+                                    default: if let Some(default) = param.default.clone() {
                                         Some(self.run(vec![default], &scope).await?)
                                     } else if param.optional {
                                         Some(Value::null())
@@ -481,7 +495,7 @@ impl Interpreter {
                                 } else {
                                     Value::fn_(
                                         params,
-                                        children,
+                                        children.clone(),
                                         scope.create_child_scope(HashMap::new()),
                                     )
                                 },
@@ -494,36 +508,44 @@ impl Interpreter {
                                 qs,
                                 default,
                                 ..
-                            } = *match_;
-                            stack.push(Frame::Match1 { label, qs, default });
-                            stack.eval(*about);
+                            } = &*match_;
+                            stack.push(Frame::Match1 {
+                                label: label.clone(),
+                                qs: qs.clone(),
+                                default: default.clone(),
+                            });
+                            stack.eval(about.clone());
                         }
                         ast::Expression::Block(block) => {
                             let ast::Block {
                                 label, statements, ..
-                            } = *block;
+                            } = &*block;
                             scope = scope.create_child_scope(HashMap::new());
-                            stack.push(Frame::Block { label });
-                            stack.run(statements);
+                            stack.push(Frame::Block {
+                                label: label.clone(),
+                            });
+                            stack.run(statements.clone());
                         }
                         ast::Expression::Exists(exists) => {
                             let exists = scope.exists(&exists.identifier.name)?;
                             value_stack.push(Value::bool(exists));
                         }
                         ast::Expression::Tmpl(tmpl) => {
-                            let mut tmpl = tmpl.tmpl;
+                            let mut tmpl = tmpl.tmpl.clone();
                             tmpl.reverse();
                             stack.push(Frame::Tmpl1 {
                                 tmpl,
                                 str: String::new(),
                             });
                         }
-                        ast::Expression::Str(str) => value_stack.push(Value::str(str.value)),
+                        ast::Expression::Str(str) => {
+                            value_stack.push(Value::str(str.value.clone()))
+                        }
                         ast::Expression::Num(num) => value_stack.push(Value::num(num.value)),
                         ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
                         ast::Expression::Null(_) => value_stack.push(Value::null()),
                         ast::Expression::Obj(obj) => {
-                            let mut obj = obj.value;
+                            let mut obj = obj.value.clone();
                             let len = obj.len();
                             obj.reverse();
                             stack.push(Frame::Obj1 {
@@ -532,7 +554,7 @@ impl Interpreter {
                             });
                         }
                         ast::Expression::Arr(arr) => {
-                            let mut arr = arr.value;
+                            let mut arr = arr.value.clone();
                             let len = arr.len();
                             arr.reverse();
                             stack.push(Frame::Arr1 {
@@ -542,164 +564,170 @@ impl Interpreter {
                         }
                         ast::Expression::Plus(plus) => {
                             stack.push(Frame::Plus);
-                            stack.eval(*plus.expr);
+                            stack.eval(plus.expr.clone());
                         }
                         ast::Expression::Minus(minus) => {
                             stack.push(Frame::Minus);
-                            stack.eval(*minus.expr);
+                            stack.eval(minus.expr.clone());
                         }
                         ast::Expression::Not(not) => {
                             stack.push(Frame::Not);
-                            stack.eval(*not.expr);
+                            stack.eval(not.expr.clone());
                         }
                         ast::Expression::Pow(pow) => {
                             let callee = scope.get("Core:pow")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Pow { left, right, .. } = *pow;
+                            let ast::Pow { left, right, .. } = &*pow;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Mul(mul) => {
                             let callee = scope.get("Core:mul")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Mul { left, right, .. } = *mul;
+                            let ast::Mul { left, right, .. } = &*mul;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Div(div) => {
                             let callee = scope.get("Core:div")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Div { left, right, .. } = *div;
+                            let ast::Div { left, right, .. } = &*div;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Rem(rem) => {
                             let callee = scope.get("Core:mod")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Rem { left, right, .. } = *rem;
+                            let ast::Rem { left, right, .. } = &*rem;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Add(add) => {
                             let callee = scope.get("Core:add")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Add { left, right, .. } = *add;
+                            let ast::Add { left, right, .. } = &*add;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Sub(sub) => {
                             let callee = scope.get("Core:sub")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Sub { left, right, .. } = *sub;
+                            let ast::Sub { left, right, .. } = &*sub;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Lt(lt) => {
                             let callee = scope.get("Core:lt")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Lt { left, right, .. } = *lt;
+                            let ast::Lt { left, right, .. } = &*lt;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Lteq(lteq) => {
                             let callee = scope.get("Core:lteq")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Lteq { left, right, .. } = *lteq;
+                            let ast::Lteq { left, right, .. } = &*lteq;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Gt(gt) => {
                             let callee = scope.get("Core:gt")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Gt { left, right, .. } = *gt;
+                            let ast::Gt { left, right, .. } = &*gt;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Gteq(gteq) => {
                             let callee = scope.get("Core:gteq")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Gteq { left, right, .. } = *gteq;
+                            let ast::Gteq { left, right, .. } = &*gteq;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Eq(eq) => {
                             let callee = scope.get("Core:eq")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Eq { left, right, .. } = *eq;
+                            let ast::Eq { left, right, .. } = &*eq;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Neq(neq) => {
                             let callee = scope.get("Core:neq")?;
                             let callee = <VFn>::try_from(callee)?;
-                            let ast::Neq { left, right, .. } = *neq;
+                            let ast::Neq { left, right, .. } = &*neq;
                             stack.push(Frame::BinOp1 {
                                 callee,
-                                right: *right,
+                                right: right.clone(),
                             });
-                            stack.eval(*left);
+                            stack.eval(left.clone());
                         }
                         ast::Expression::And(and) => {
-                            let ast::And { left, right, .. } = *and;
-                            stack.push(Frame::And1 { right: *right });
-                            stack.eval(*left);
+                            let ast::And { left, right, .. } = &*and;
+                            stack.push(Frame::And1 {
+                                right: right.clone(),
+                            });
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Or(or) => {
-                            let ast::Or { left, right, .. } = *or;
-                            stack.push(Frame::Or1 { right: *right });
-                            stack.eval(*left);
+                            let ast::Or { left, right, .. } = &*or;
+                            stack.push(Frame::Or1 {
+                                right: right.clone(),
+                            });
+                            stack.eval(left.clone());
                         }
                         ast::Expression::Identifier(identifier) => {
                             let value = scope.get(&identifier.name)?;
                             value_stack.push(value);
                         }
                         ast::Expression::Call(call) => {
-                            let ast::Call { target, args, .. } = *call;
-                            stack.push(Frame::Call1 { args });
-                            stack.eval(*target);
+                            let ast::Call { target, args, .. } = &*call;
+                            stack.push(Frame::Call1 { args: args.clone() });
+                            stack.eval(target.clone());
                         }
                         ast::Expression::Index(index) => {
-                            let ast::Index { target, index, .. } = *index;
-                            stack.push(Frame::Index1 { index: *index });
-                            stack.eval(*target);
+                            let ast::Index { target, index, .. } = &*index;
+                            stack.push(Frame::Index1 {
+                                index: index.clone(),
+                            });
+                            stack.eval(target.clone());
                         }
                         ast::Expression::Prop(prop) => {
-                            let ast::Prop { target, name, .. } = *prop;
-                            stack.push(Frame::Prop { name });
-                            stack.eval(*target);
+                            let ast::Prop { target, name, .. } = &*prop;
+                            stack.push(Frame::Prop { name: name.clone() });
+                            stack.eval(target.clone());
                         }
                     }
                 }
@@ -711,11 +739,11 @@ impl Interpreter {
                         value.attr = attr.map(|attr| {
                             attr.into_iter()
                                 .filter_map(|ast::Attribute { name, value, .. }| {
-                                    node_to_value(value).map(|value| Attr { name, value })
+                                    node_to_value(&value).map(|value| Attr { name, value })
                                 })
                                 .collect()
                         });
-                        scope.define(dest, value, mut_)?;
+                        scope.define(&dest, value, mut_)?;
                         value_stack.push(Value::null());
                     }
                 }
@@ -749,14 +777,14 @@ impl Interpreter {
                     for_,
                 } => {
                     if let Some(item) = items.pop() {
+                        scope = scope.create_child_scope(HashMap::new());
+                        scope.define(&var, item, false)?;
                         stack.push(Frame::Each3 {
                             label,
-                            var: var.clone(),
+                            var,
                             items,
                             for_: for_.clone(),
                         });
-                        scope = scope.create_child_scope(HashMap::new());
-                        scope.define(var, item, false)?;
                         stack.eval(for_);
                     } else {
                         value_stack.push(Value::null());
@@ -987,7 +1015,7 @@ impl Interpreter {
                     match dest {
                         ast::Expression::Identifier(identifier) => {
                             stack.push(Frame::AssignIdentifier {
-                                name: identifier.name,
+                                name: identifier.name.clone(),
                                 op,
                             });
                             if let Some(expr) = expr {
@@ -995,21 +1023,25 @@ impl Interpreter {
                             }
                         }
                         ast::Expression::Index(index) => {
-                            let ast::Index { target, index, .. } = *index;
+                            let ast::Index { target, index, .. } = &*index;
                             stack.push(Frame::AssignIndex1 {
-                                index: *index,
+                                index: index.clone(),
                                 expr,
                                 op,
                             });
-                            stack.eval(*target);
+                            stack.eval(target.clone());
                         }
                         ast::Expression::Prop(prop) => {
-                            let ast::Prop { target, name, .. } = *prop;
-                            stack.push(Frame::AssignProp1 { name, expr, op });
-                            stack.eval(*target);
+                            let ast::Prop { target, name, .. } = &*prop;
+                            stack.push(Frame::AssignProp1 {
+                                name: name.to_string(),
+                                expr,
+                                op,
+                            });
+                            stack.eval(target.clone());
                         }
                         ast::Expression::Arr(arr) => {
-                            let arr = arr.value;
+                            let arr = arr.value.clone();
                             let len = arr.len();
                             for item in arr.into_iter().rev() {
                                 stack.push(Frame::Assign {
@@ -1025,7 +1057,7 @@ impl Interpreter {
                         }
                         ast::Expression::Obj(obj) => {
                             let (keys, values): (Vec<String>, Vec<ast::Expression>) =
-                                obj.value.into_iter().rev().unzip();
+                                obj.value.clone().into_iter().rev().unzip();
                             for item in values {
                                 stack.push(Frame::Assign {
                                     dest: item,
@@ -1247,7 +1279,6 @@ impl Interpreter {
                             });
                             stack.eval(cond);
                         } else if let Some(else_) = else_ {
-                            let else_ = *else_;
                             let is_statement =
                                 matches!(else_, ast::StatementOrExpression::Statement(_));
                             if is_statement {
@@ -1301,13 +1332,12 @@ impl Interpreter {
                         stack.push(Frame::Match3 {
                             label,
                             about,
-                            a: a.into(),
+                            a,
                             qs,
                             default,
                         });
                         stack.eval(q);
                     } else if let Some(default) = default {
-                        let default = *default;
                         let is_statement =
                             matches!(default, ast::StatementOrExpression::Statement(_));
                         if is_statement {
@@ -1333,7 +1363,6 @@ impl Interpreter {
                     if q.is_control() {
                         value_stack.push(q);
                     } else if about == q {
-                        let a = *a;
                         let is_statement = matches!(a, ast::StatementOrExpression::Statement(_));
                         if is_statement {
                             scope = scope.create_child_scope(HashMap::new());
@@ -1574,7 +1603,7 @@ impl Interpreter {
                             zip(params, args.into_iter().map(Some).chain(repeat(None)))
                         {
                             let arg = expect_any(arg.or(param.default))?;
-                            scope.define(param.dest, arg, true)?;
+                            scope.define(&param.dest, arg, true)?;
                         }
                         stack.run(statements);
                     }

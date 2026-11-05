@@ -135,7 +135,7 @@ fn parse_prefix(
                     ast::Num {
                         loc: ast::Loc {
                             start: start_pos,
-                            end: num.loc.end,
+                            end: num.loc.end.clone(),
                         },
                         value: num.value,
                     }
@@ -148,7 +148,7 @@ fn parse_prefix(
                             start: start_pos,
                             end: s.peek().pos().clone(),
                         },
-                        expr: expr.into(),
+                        expr,
                     }
                     .into(),
                 )
@@ -160,7 +160,7 @@ fn parse_prefix(
                     ast::Num {
                         loc: ast::Loc {
                             start: start_pos,
-                            end: num.loc.end,
+                            end: num.loc.end.clone(),
                         },
                         value: -num.value,
                     }
@@ -173,7 +173,7 @@ fn parse_prefix(
                             start: start_pos,
                             end: s.peek().pos().clone(),
                         },
-                        expr: expr.into(),
+                        expr,
                     }
                     .into(),
                 )
@@ -185,7 +185,7 @@ fn parse_prefix(
                     start: start_pos,
                     end: s.peek().pos().clone(),
                 },
-                expr: expr.into(),
+                expr,
             }
             .into(),
         ),
@@ -223,7 +223,7 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    target: left.into(),
+                    target: left,
                     name,
                 }
                 .into(),
@@ -238,8 +238,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -253,8 +253,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -268,8 +268,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -283,8 +283,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -298,8 +298,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -313,8 +313,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -328,8 +328,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -343,8 +343,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -358,8 +358,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -373,8 +373,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -388,8 +388,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -403,8 +403,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -418,8 +418,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -433,8 +433,8 @@ fn parse_infix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    left: left.into(),
-                    right: right.into(),
+                    left,
+                    right,
                 }
                 .into(),
             )
@@ -470,8 +470,8 @@ fn parse_postfix(
                         start: start_pos,
                         end: s.peek().pos().clone(),
                     },
-                    target: expr.into(),
-                    index: index.into(),
+                    target: expr,
+                    index,
                 }
                 .into(),
             )
@@ -757,7 +757,7 @@ fn parse_call(
             start: start_pos,
             end: s.peek().pos().clone(),
         },
-        target: target.into(),
+        target,
         args: items,
     })
 }
@@ -797,28 +797,36 @@ fn parse_expr_with_label(s: &mut Tokens) -> Result<ast::Expression, AiScriptSynt
     Ok(match parse_expr(s)? {
         ast::Expression::If(if_) => ast::Expression::If(
             ast::If {
+                loc: if_.loc.clone(),
                 label: Some(label),
-                ..*if_
+                cond: if_.cond.clone(),
+                then: if_.then.clone(),
+                elseif: if_.elseif.clone(),
+                else_: if_.else_.clone(),
             }
             .into(),
         ),
         ast::Expression::Match(match_) => ast::Expression::Match(
             ast::Match {
+                loc: match_.loc.clone(),
                 label: Some(label),
-                ..*match_
+                about: match_.about.clone(),
+                qs: match_.qs.clone(),
+                default: match_.default.clone(),
             }
             .into(),
         ),
         ast::Expression::Block(block) => ast::Expression::Block(
             ast::Block {
+                loc: block.loc.clone(),
                 label: Some(label),
-                ..*block
+                statements: block.statements.clone(),
             }
             .into(),
         ),
         expression => Err(AiScriptSyntaxError {
             kind: AiScriptSyntaxErrorKind::InvalidExpressionWithLabel,
-            pos: expression.into_loc().start,
+            pos: expression.loc().start.clone(),
         })?,
     })
 }
@@ -851,7 +859,7 @@ fn parse_if(start_pos: ast::Pos, s: &mut Tokens) -> Result<ast::If, AiScriptSynt
 
     let else_ = if let Token::ElseKeyword { .. } = s.peek() {
         s.pop_token();
-        Some(parse_block_or_statement(s)?.into())
+        Some(parse_block_or_statement(s)?)
     } else {
         None
     };
@@ -862,8 +870,8 @@ fn parse_if(start_pos: ast::Pos, s: &mut Tokens) -> Result<ast::If, AiScriptSynt
             end: s.peek().pos().clone(),
         },
         label: None,
-        cond: cond.into(),
-        then: then.into(),
+        cond,
+        then,
         elseif,
         else_,
     })
@@ -981,7 +989,7 @@ fn parse_match(start_pos: ast::Pos, s: &mut Tokens) -> Result<ast::Match, AiScri
                     })?,
                 };
 
-                break Some(x.into());
+                break Some(x);
             }
             Token::CloseBrace { .. } => break None,
             Token::Eof { pos, .. } => Err(AiScriptSyntaxError {
@@ -1001,7 +1009,7 @@ fn parse_match(start_pos: ast::Pos, s: &mut Tokens) -> Result<ast::Match, AiScri
             end: s.peek().pos().clone(),
         },
         label: None,
-        about: about.into(),
+        about,
         qs,
         default: x,
     })

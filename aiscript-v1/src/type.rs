@@ -113,7 +113,7 @@ impl std::fmt::Display for ast::TypeSource {
 }
 
 pub fn get_type_by_source(
-    type_source: ast::TypeSource,
+    type_source: &ast::TypeSource,
     type_params: &[&ast::TypeParam],
 ) -> Result<Type, AiScriptSyntaxError> {
     match type_source {
@@ -124,7 +124,7 @@ pub fn get_type_by_source(
                 && named_type_source.inner.is_none()
             {
                 return Ok(Type::Param {
-                    name: type_param.name.clone(),
+                    name: type_param.name.to_string(),
                 });
             }
             match named_type_source.name.as_str() {
@@ -132,47 +132,51 @@ pub fn get_type_by_source(
                     if named_type_source.inner.is_none() =>
                 {
                     Ok(Type::Simple {
-                        name: named_type_source.name,
+                        name: named_type_source.name.to_string(),
                     })
                 }
                 "arr" | "obj" => {
                     let inner_type = named_type_source
                         .inner
-                        .map(|inner| get_type_by_source(*inner, type_params))
+                        .as_ref()
+                        .map(|inner| get_type_by_source(inner, type_params))
                         .unwrap_or_else(|| {
                             Ok(Type::Simple {
                                 name: "any".to_string(),
                             })
                         })?;
                     Ok(Type::Generic {
-                        name: named_type_source.name,
+                        name: named_type_source.name.to_string(),
                         inners: vec![inner_type],
                     })
                 }
                 _ => Err(AiScriptSyntaxError {
                     kind: AiScriptSyntaxErrorKind::UnknownType(named_type_source.to_string()),
-                    pos: named_type_source.loc.start,
+                    pos: named_type_source.loc.start.clone(),
                 }),
             }
         }
         ast::TypeSource::FnTypeSource(fn_type_source) => {
-            let fn_type_params = fn_type_source.type_params.unwrap_or_default();
-            let mut fn_type_params = fn_type_params.iter().collect::<Vec<&ast::TypeParam>>();
+            let mut fn_type_params = fn_type_source
+                .type_params
+                .iter()
+                .flatten()
+                .collect::<Vec<&ast::TypeParam>>();
             fn_type_params.extend_from_slice(type_params);
             let param_types = fn_type_source
                 .params
-                .into_iter()
+                .iter()
                 .map(|param| get_type_by_source(param, &fn_type_params))
                 .collect::<Result<Vec<Type>, AiScriptSyntaxError>>()?;
             Ok(Type::Fn {
                 params: param_types,
-                result: get_type_by_source(*fn_type_source.result, &fn_type_params)?.into(),
+                result: get_type_by_source(&fn_type_source.result, &fn_type_params)?.into(),
             })
         }
         ast::TypeSource::UnionTypeSource(union_type_source) => {
             let inner_types = union_type_source
                 .inners
-                .into_iter()
+                .iter()
                 .map(|inner| get_type_by_source(inner, type_params))
                 .collect::<Result<Vec<Type>, AiScriptSyntaxError>>()?;
             Ok(Type::Union {

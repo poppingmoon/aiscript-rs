@@ -1101,14 +1101,14 @@ peg::parser! {
         //
 
         rule type_() -> TypeSource
-            = fn_type:fn_type() { TypeSource::FnTypeSource(fn_type) }
-            / named_type:named_type() { TypeSource::NamedTypeSource(named_type) }
+            = fn_type:fn_type() { TypeSource::FnTypeSource(fn_type.into()) }
+            / named_type:named_type() { TypeSource::NamedTypeSource(named_type.into()) }
 
         rule fn_type() -> FnTypeSource
             = start:position!() "@(" _* args:arg_types()? _* ")" _* "=>" _* result:type_() end:position!() {
                 FnTypeSource{
                     args: args.unwrap_or_default(),
-                    result: result.into(),
+                    result,
                     loc: Some(Loc{ start, end: end - 1 }),
                 }
             }
@@ -1120,7 +1120,7 @@ peg::parser! {
             = start:position!() name:name() __* "<" __* inner:type_() __* ">" end:position!() {
                 NamedTypeSource {
                     name,
-                    inner: Some(inner.into()),
+                    inner: Some(inner),
                     loc: Some(Loc{ start, end: end - 1 }),
                 }
             }

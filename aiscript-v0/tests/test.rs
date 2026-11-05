@@ -1566,9 +1566,9 @@ mod chain {
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line {
             assert_eq!(prop.name, "c".to_string());
-            if let Expression::Prop(prop) = *prop.target {
+            if let Expression::Prop(prop) = &prop.target {
                 assert_eq!(prop.name, "b".to_string());
-                if let Expression::Identifier(identifier) = *prop.target {
+                if let Expression::Identifier(identifier) = &prop.target {
                     assert_eq!(identifier.name, "a".to_string());
                     return;
                 }
@@ -1589,9 +1589,12 @@ mod chain {
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line {
             assert_eq!(prop.name, "b".to_string());
-            if let Expression::Index(index) = *prop.target
-                && let (Expression::Identifier(identifier), Expression::Num(num)) =
-                    (*index.target, *index.index)
+            if let Expression::Index(index) = &prop.target
+                && let Index {
+                    target: Expression::Identifier(identifier),
+                    index: Expression::Num(num),
+                    ..
+                } = &**index
             {
                 assert_eq!(identifier.name, "a".to_string());
                 assert_eq!(num.value, 42.0);
@@ -1613,8 +1616,8 @@ mod chain {
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line {
             assert_eq!(prop.name, "bar".to_string());
-            if let Expression::Call(call) = *prop.target
-                && let Expression::Identifier(identifier) = *call.target
+            if let Expression::Call(call) = &prop.target
+                && let Expression::Identifier(identifier) = &call.target
             {
                 assert_eq!(identifier.name, "foo".to_string());
                 if let [Expression::Num(num_1), Expression::Num(num_2)] = &call.args[..] {
@@ -1639,13 +1642,13 @@ mod chain {
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line {
             assert_eq!(prop.name, "e".to_string());
-            if let Expression::Prop(prop) = *prop.target {
+            if let Expression::Prop(prop) = &prop.target {
                 assert_eq!(prop.name, "d".to_string());
-                if let Expression::Prop(prop) = *prop.target {
+                if let Expression::Prop(prop) = &prop.target {
                     assert_eq!(prop.name, "c".to_string());
-                    if let Expression::Prop(prop) = *prop.target {
+                    if let Expression::Prop(prop) = &prop.target {
                         assert_eq!(prop.name, "b".to_string());
-                        if let Expression::Identifier(identifier) = *prop.target {
+                        if let Expression::Identifier(identifier) = &prop.target {
                             assert_eq!(identifier.name, "a".to_string());
                             return;
                         }
@@ -1668,12 +1671,13 @@ mod chain {
         let line = ast.first().unwrap().clone();
         if let Node::Expression(Expression::Prop(prop)) = line.clone() {
             assert_eq!(prop.name, "d".to_string());
-            if let Expression::If(if_) = *prop.target
-                && let (
-                    Expression::Identifier(cond),
-                    StatementOrExpression::Expression(Expression::Identifier(then)),
-                    StatementOrExpression::Expression(Expression::Identifier(else_)),
-                ) = (*if_.cond, *if_.then, *if_.else_.unwrap())
+            if let Expression::If(if_) = &prop.target
+                && let If {
+                    cond: Expression::Identifier(cond),
+                    then: StatementOrExpression::Expression(Expression::Identifier(then)),
+                    else_: Some(StatementOrExpression::Expression(Expression::Identifier(else_))),
+                    ..
+                } = &**if_
             {
                 assert_eq!(cond.name, "a".to_string());
                 assert_eq!(then.name, "b".to_string());

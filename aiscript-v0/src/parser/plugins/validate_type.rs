@@ -15,7 +15,7 @@ impl Visitor for TypeValidator {
         if let cst::Statement::Definition(definition) = &statement
             && let Some(var_type) = definition.var_type.as_ref()
         {
-            Type::try_from(var_type.clone())?;
+            Type::try_from(var_type)?;
         };
         Ok(statement)
     }
@@ -27,7 +27,7 @@ impl Visitor for TypeValidator {
         if let cst::Expression::Fn(fn_) = &expression
             && let Some(ret_type) = fn_.ret_type.as_ref()
         {
-            Type::try_from(ret_type.clone())?;
+            Type::try_from(ret_type)?;
         };
         Ok(expression)
     }

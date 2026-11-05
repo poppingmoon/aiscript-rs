@@ -55,236 +55,184 @@ struct KeywordValidator;
 impl Visitor for KeywordValidator {
     fn visit_identifier(
         &mut self,
-        identifier: ast::Identifier,
-    ) -> Result<ast::Identifier, AiScriptSyntaxError> {
+        identifier: &ast::Identifier,
+    ) -> Result<Option<ast::Identifier>, AiScriptSyntaxError> {
         if RESERVED_WORD.contains(&identifier.name.as_str()) {
             Err(AiScriptSyntaxError {
-                kind: AiScriptSyntaxErrorKind::ReservedWord(identifier.name),
-                pos: identifier.loc.start,
-            })
-        } else {
-            Ok(identifier)
+                kind: AiScriptSyntaxErrorKind::ReservedWord(identifier.name.to_string()),
+                pos: identifier.loc.start.clone(),
+            })?
         }
+        Ok(None)
     }
 
     fn callback_namespace(
         &mut self,
-        namespace: ast::Namespace,
-    ) -> Result<ast::Namespace, AiScriptSyntaxError> {
+        namespace: &ast::Namespace,
+    ) -> Result<Option<ast::Namespace>, AiScriptSyntaxError> {
         if RESERVED_WORD.contains(&namespace.name.as_str()) {
             Err(AiScriptSyntaxError {
-                kind: AiScriptSyntaxErrorKind::ReservedWord(namespace.name),
-                pos: namespace.loc.start,
-            })
-        } else {
-            Ok(namespace)
+                kind: AiScriptSyntaxErrorKind::ReservedWord(namespace.name.to_string()),
+                pos: namespace.loc.start.clone(),
+            })?
         }
+        Ok(None)
     }
 
-    fn callback_meta(&mut self, meta: ast::Meta) -> Result<ast::Meta, AiScriptSyntaxError> {
+    fn callback_meta(
+        &mut self,
+        meta: &ast::Meta,
+    ) -> Result<Option<ast::Meta>, AiScriptSyntaxError> {
         match meta {
             ast::Meta {
                 loc,
                 name: Some(name),
                 ..
             } if RESERVED_WORD.contains(&name.as_str()) => Err(AiScriptSyntaxError {
-                kind: AiScriptSyntaxErrorKind::ReservedWord(name),
-                pos: loc.start,
+                kind: AiScriptSyntaxErrorKind::ReservedWord(name.to_string()),
+                pos: loc.start.clone(),
             })?,
-            _ => Ok(meta),
+            _ => {}
         }
+        Ok(None)
     }
 
     fn callback_statement(
         &mut self,
-        statement: ast::Statement,
-    ) -> Result<ast::Statement, AiScriptSyntaxError> {
+        statement: &ast::Statement,
+    ) -> Result<Option<ast::Statement>, AiScriptSyntaxError> {
         match statement {
             ast::Statement::Definition(definition) => {
-                let definition = *definition;
-                let dest = DestKeywordValidator.visit_expression(definition.dest)?;
-                Ok(ast::Statement::Definition(
-                    ast::Definition { dest, ..definition }.into(),
-                ))
+                DestKeywordValidator.visit_expression(&definition.dest)?;
             }
             ast::Statement::Each(each) => {
-                let each = *each;
-                match each {
-                    ast::Each {
-                        loc,
-                        label: Some(label),
-                        ..
-                    } if RESERVED_WORD.contains(&label.as_str()) => Err(AiScriptSyntaxError {
-                        kind: AiScriptSyntaxErrorKind::ReservedWord(label),
-                        pos: loc.start,
-                    }),
-                    ast::Each { var, .. } => {
-                        let var = DestKeywordValidator.visit_expression(var)?;
-                        Ok(ast::Statement::Each(ast::Each { var, ..each }.into()))
-                    }
+                if let Some(label) = &each.label
+                    && RESERVED_WORD.contains(&label.as_str())
+                {
+                    Err(AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(label.to_string()),
+                        pos: each.loc.start.clone(),
+                    })?
+                } else {
+                    DestKeywordValidator.visit_expression(&each.var)?;
                 }
             }
-            ast::Statement::For(for_) => match *for_ {
-                ast::For {
-                    loc,
-                    label: Some(label),
-                    ..
-                } if RESERVED_WORD.contains(&label.as_str()) => Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::ReservedWord(label),
-                    pos: loc.start,
-                }),
-                _ => Ok(ast::Statement::For(for_)),
-            },
-            ast::Statement::ForLet(for_let) => match *for_let {
-                ast::ForLet { loc, var, .. } if RESERVED_WORD.contains(&var.as_str()) => {
+            ast::Statement::For(for_) => {
+                if let Some(label) = &for_.label
+                    && RESERVED_WORD.contains(&label.as_str())
+                {
                     Err(AiScriptSyntaxError {
-                        kind: AiScriptSyntaxErrorKind::ReservedWord(var),
-                        pos: loc.start,
-                    })
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(label.to_string()),
+                        pos: for_.loc.start.clone(),
+                    })?
                 }
-                _ => Ok(ast::Statement::ForLet(for_let)),
-            },
-            ast::Statement::Loop(loop_) => match *loop_ {
-                ast::Loop {
-                    loc,
-                    label: Some(label),
-                    ..
-                } if RESERVED_WORD.contains(&label.as_str()) => Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::ReservedWord(label),
-                    pos: loc.start,
-                }),
-                _ => Ok(ast::Statement::Loop(loop_)),
-            },
-            ast::Statement::Break(break_) => match *break_ {
-                ast::Break {
-                    loc,
-                    label: Some(label),
-                    ..
-                } if RESERVED_WORD.contains(&label.as_str()) => Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::ReservedWord(label),
-                    pos: loc.start,
-                }),
-                _ => Ok(ast::Statement::Break(break_)),
-            },
-            ast::Statement::Continue(continue_) => match *continue_ {
-                ast::Continue {
-                    loc,
-                    label: Some(label),
-                    ..
-                } if RESERVED_WORD.contains(&label.as_str()) => Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::ReservedWord(label),
-                    pos: loc.start,
-                }),
-                _ => Ok(ast::Statement::Continue(continue_)),
-            },
-            _ => Ok(statement),
+            }
+            ast::Statement::ForLet(for_let) => {
+                if RESERVED_WORD.contains(&for_let.var.as_str()) {
+                    Err(AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(for_let.var.to_string()),
+                        pos: for_let.loc.start.clone(),
+                    })?
+                }
+            }
+            ast::Statement::Loop(loop_) => {
+                if let Some(label) = &loop_.label
+                    && RESERVED_WORD.contains(&label.as_str())
+                {
+                    Err(AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(label.to_string()),
+                        pos: loop_.loc.start.clone(),
+                    })?
+                }
+            }
+            ast::Statement::Break(break_) => {
+                if let Some(label) = &break_.label
+                    && RESERVED_WORD.contains(&label.as_str())
+                {
+                    Err(AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(label.to_string()),
+                        pos: break_.loc.start.clone(),
+                    })?
+                }
+            }
+            ast::Statement::Continue(continue_) => {
+                if let Some(label) = &continue_.label
+                    && RESERVED_WORD.contains(&label.as_str())
+                {
+                    Err(AiScriptSyntaxError {
+                        kind: AiScriptSyntaxErrorKind::ReservedWord(label.to_string()),
+                        pos: continue_.loc.start.clone(),
+                    })?
+                }
+            }
+            _ => {}
         }
+        Ok(None)
     }
 
     fn callback_expression(
         &mut self,
-        expression: ast::Expression,
-    ) -> Result<ast::Expression, AiScriptSyntaxError> {
-        match expression {
-            ast::Expression::Fn(fn_) => {
-                let fn_ = *fn_;
-                let type_params = fn_
-                    .type_params
-                    .map(|type_params| {
-                        type_params
-                            .into_iter()
-                            .map(|type_param| {
-                                if RESERVED_WORD.contains(&type_param.name.as_str()) {
-                                    Err(AiScriptSyntaxError {
-                                        kind: AiScriptSyntaxErrorKind::ReservedWord(
-                                            type_param.name,
-                                        ),
-                                        pos: fn_.loc.start.clone(),
-                                    })
-                                } else {
-                                    Ok(type_param)
-                                }
-                            })
-                            .collect::<Result<Vec<ast::TypeParam>, AiScriptSyntaxError>>()
-                    })
-                    .transpose()?;
-                let params = fn_
-                    .params
-                    .into_iter()
-                    .map(|param| {
-                        DestKeywordValidator
-                            .visit_expression(param.dest)
-                            .map(|dest| ast::Param { dest, ..param })
-                    })
-                    .collect::<Result<Vec<ast::Param>, AiScriptSyntaxError>>()?;
-                Ok(ast::Expression::Fn(
-                    ast::Fn {
-                        type_params,
-                        params,
-                        ..fn_
+        expression: &ast::Expression,
+    ) -> Result<Option<ast::Expression>, AiScriptSyntaxError> {
+        if let ast::Expression::Fn(fn_) = expression {
+            if let Some(type_params) = &fn_.type_params {
+                for ast::TypeParam { name, .. } in type_params {
+                    if RESERVED_WORD.contains(&name.as_str()) {
+                        Err(AiScriptSyntaxError {
+                            kind: AiScriptSyntaxErrorKind::ReservedWord(name.to_string()),
+                            pos: fn_.loc.start.clone(),
+                        })?
                     }
-                    .into(),
-                ))
+                }
             }
-            _ => Ok(expression),
+            for ast::Param { dest, .. } in &fn_.params {
+                DestKeywordValidator.visit_expression(dest)?;
+            }
         }
+        Ok(None)
     }
 
     fn callback_type_source(
         &mut self,
-        type_source: ast::TypeSource,
-    ) -> Result<ast::TypeSource, AiScriptSyntaxError> {
+        type_source: &ast::TypeSource,
+    ) -> Result<Option<ast::TypeSource>, AiScriptSyntaxError> {
         match type_source {
-            ast::TypeSource::NamedTypeSource(ast::NamedTypeSource { loc, name, .. })
-                if RESERVED_WORD.contains(&name.as_str()) =>
+            ast::TypeSource::NamedTypeSource(named_type_source)
+                if RESERVED_WORD.contains(&named_type_source.name.as_str()) =>
             {
                 Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::ReservedWord(name),
-                    pos: loc.start,
-                })
+                    kind: AiScriptSyntaxErrorKind::ReservedWord(named_type_source.name.to_string()),
+                    pos: named_type_source.loc.start.clone(),
+                })?
             }
             ast::TypeSource::FnTypeSource(fn_type_source) => {
-                let type_params = fn_type_source
-                    .type_params
-                    .map(|type_params| {
-                        type_params
-                            .into_iter()
-                            .map(|type_param| {
-                                if RESERVED_WORD.contains(&type_param.name.as_str()) {
-                                    Err(AiScriptSyntaxError {
-                                        kind: AiScriptSyntaxErrorKind::ReservedWord(
-                                            type_param.name,
-                                        ),
-                                        pos: fn_type_source.loc.start.clone(),
-                                    })
-                                } else {
-                                    Ok(type_param)
-                                }
-                            })
-                            .collect::<Result<Vec<ast::TypeParam>, AiScriptSyntaxError>>()
-                    })
-                    .transpose()?;
-                Ok(ast::TypeSource::FnTypeSource(ast::FnTypeSource {
-                    type_params,
-                    ..fn_type_source
-                }))
+                if let Some(type_params) = &fn_type_source.type_params {
+                    for ast::TypeParam { name, .. } in type_params {
+                        if RESERVED_WORD.contains(&name.as_str()) {
+                            Err(AiScriptSyntaxError {
+                                kind: AiScriptSyntaxErrorKind::ReservedWord(name.to_string()),
+                                pos: fn_type_source.loc.start.clone(),
+                            })?
+                        }
+                    }
+                }
             }
-            _ => Ok(type_source),
+            _ => {}
         }
+        Ok(None)
     }
 
     fn callback_attribute(
         &mut self,
-        attribute: ast::Attribute,
-    ) -> Result<ast::Attribute, AiScriptSyntaxError> {
+        attribute: &ast::Attribute,
+    ) -> Result<Option<ast::Attribute>, AiScriptSyntaxError> {
         if RESERVED_WORD.contains(&attribute.name.as_str()) {
             Err(AiScriptSyntaxError {
-                kind: AiScriptSyntaxErrorKind::ReservedWord(attribute.name),
-                pos: attribute.loc.start,
-            })
-        } else {
-            Ok(attribute)
+                kind: AiScriptSyntaxErrorKind::ReservedWord(attribute.name.to_string()),
+                pos: attribute.loc.start.clone(),
+            })?
         }
+        Ok(None)
     }
 }
 
@@ -293,27 +241,26 @@ struct DestKeywordValidator;
 impl Visitor for DestKeywordValidator {
     fn callback_expression(
         &mut self,
-        expression: ast::Expression,
-    ) -> Result<ast::Expression, AiScriptSyntaxError> {
+        expression: &ast::Expression,
+    ) -> Result<Option<ast::Expression>, AiScriptSyntaxError> {
         match expression {
             ast::Expression::Null(null) => Err(AiScriptSyntaxError {
                 kind: AiScriptSyntaxErrorKind::ReservedWord("null".to_string()),
-                pos: null.loc.start,
-            }),
+                pos: null.loc.start.clone(),
+            })?,
             ast::Expression::Bool(bool) => Err(AiScriptSyntaxError {
                 kind: AiScriptSyntaxErrorKind::ReservedWord(bool.value.to_string()),
-                pos: bool.loc.start,
-            }),
-            _ => Ok(expression),
+                pos: bool.loc.start.clone(),
+            })?,
+            _ => {}
         }
+        Ok(None)
     }
 }
 
-pub fn validate_keyword(
-    nodes: impl IntoIterator<Item = ast::Node>,
-) -> Result<Vec<ast::Node>, AiScriptSyntaxError> {
-    nodes
-        .into_iter()
-        .map(|node| KeywordValidator.visit_node(node))
-        .collect()
+pub fn validate_keyword(nodes: Vec<ast::Node>) -> Result<Vec<ast::Node>, AiScriptSyntaxError> {
+    for node in &nodes {
+        KeywordValidator.visit_node(node)?;
+    }
+    Ok(nodes)
 }

@@ -2,6 +2,8 @@
 //!
 //! ASTノードはCSTノードをインタプリタ等から操作しやすい構造に変形したものです。
 
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -12,16 +14,16 @@ pub struct Loc {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
-    Namespace(Box<Namespace>),
-    Meta(Box<Meta>),
+    Namespace(Arc<Namespace>),
+    Meta(Arc<Meta>),
     Statement(Statement),
     Expression(Expression),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DefinitionOrNamespace {
-    Definition(Box<Definition>),
-    Namespace(Box<Namespace>),
+    Definition(Arc<Definition>),
+    Namespace(Arc<Namespace>),
 }
 
 impl From<DefinitionOrNamespace> for Node {
@@ -58,16 +60,16 @@ pub enum StringOrExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
-    Definition(Box<Definition>),
-    Return(Box<Return>),
-    Each(Box<Each>),
-    For(Box<For>),
-    Loop(Box<Loop>),
-    Break(Box<Break>),
-    Continue(Box<Continue>),
-    Assign(Box<Assign>),
-    AddAssign(Box<AddAssign>),
-    SubAssign(Box<SubAssign>),
+    Definition(Arc<Definition>),
+    Return(Arc<Return>),
+    Each(Arc<Each>),
+    For(Arc<For>),
+    Loop(Arc<Loop>),
+    Break(Arc<Break>),
+    Continue(Arc<Continue>),
+    Assign(Arc<Assign>),
+    AddAssign(Arc<AddAssign>),
+    SubAssign(Arc<SubAssign>),
 }
 
 impl From<Statement> for Node {
@@ -78,25 +80,25 @@ impl From<Statement> for Node {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    If(Box<If>),
-    Fn(Box<Fn>),
-    Match(Box<Match>),
-    Block(Box<Block>),
-    Exists(Box<Exists>),
-    Tmpl(Box<Tmpl>),
-    Str(Box<Str>),
-    Num(Box<Num>),
-    Bool(Box<Bool>),
-    Null(Box<Null>),
-    Obj(Box<Obj>),
-    Arr(Box<Arr>),
-    Not(Box<Not>),
-    And(Box<And>),
-    Or(Box<Or>),
-    Identifier(Box<Identifier>),
-    Call(Box<Call>),
-    Index(Box<Index>),
-    Prop(Box<Prop>),
+    If(Arc<If>),
+    Fn(Arc<Fn>),
+    Match(Arc<Match>),
+    Block(Arc<Block>),
+    Exists(Arc<Exists>),
+    Tmpl(Arc<Tmpl>),
+    Str(Arc<Str>),
+    Num(Arc<Num>),
+    Bool(Arc<Bool>),
+    Null(Arc<Null>),
+    Obj(Arc<Obj>),
+    Arr(Arc<Arr>),
+    Not(Arc<Not>),
+    And(Arc<And>),
+    Or(Arc<Or>),
+    Identifier(Arc<Identifier>),
+    Call(Arc<Call>),
+    Index(Arc<Index>),
+    Prop(Arc<Prop>),
 }
 
 impl From<Expression> for Node {
@@ -150,20 +152,20 @@ pub struct Return {
 // each文
 #[derive(Debug, PartialEq, Clone)]
 pub struct Each {
-    pub var: String,                      // イテレータ変数名
-    pub items: Expression,                // 配列
-    pub for_: Box<StatementOrExpression>, // 本体処理
+    pub var: String,                 // イテレータ変数名
+    pub items: Expression,           // 配列
+    pub for_: StatementOrExpression, // 本体処理
     pub loc: Option<Loc>,
 }
 
 // for文
 #[derive(Debug, PartialEq, Clone)]
 pub struct For {
-    pub var: Option<String>,              // イテレータ変数名
-    pub from: Option<Expression>,         // 開始値
-    pub to: Option<Expression>,           // 終値
-    pub times: Option<Expression>,        // 回数
-    pub for_: Box<StatementOrExpression>, // 本体処理
+    pub var: Option<String>,         // イテレータ変数名
+    pub from: Option<Expression>,    // 開始値
+    pub to: Option<Expression>,      // 終値
+    pub times: Option<Expression>,   // 回数
+    pub for_: StatementOrExpression, // 本体処理
     pub loc: Option<Loc>,
 }
 
@@ -213,22 +215,22 @@ pub struct Assign {
 // 否定
 #[derive(Debug, PartialEq, Clone)]
 pub struct Not {
-    pub expr: Box<Expression>, // 式
+    pub expr: Expression, // 式
     pub loc: Option<Loc>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct And {
-    pub left: Box<Expression>,
-    pub right: Box<Expression>,
+    pub left: Expression,
+    pub right: Expression,
     pub operator_loc: Loc,
     pub loc: Option<Loc>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Or {
-    pub left: Box<Expression>,
-    pub right: Box<Expression>,
+    pub left: Expression,
+    pub right: Expression,
     pub operator_loc: Loc,
     pub loc: Option<Loc>,
 }
@@ -236,10 +238,10 @@ pub struct Or {
 // if式
 #[derive(Debug, PartialEq, Clone)]
 pub struct If {
-    pub cond: Box<Expression>,            // 条件式
-    pub then: Box<StatementOrExpression>, // then節
+    pub cond: Expression,            // 条件式
+    pub then: StatementOrExpression, // then節
     pub elseif: Vec<Elseif>,
-    pub else_: Option<Box<StatementOrExpression>>, // else節
+    pub else_: Option<StatementOrExpression>, // else節
     pub loc: Option<Loc>,
 }
 
@@ -267,9 +269,9 @@ pub struct Arg {
 // パターンマッチ
 #[derive(Debug, PartialEq, Clone)]
 pub struct Match {
-    pub about: Box<Expression>, // 対象
+    pub about: Expression, // 対象
     pub qs: Vec<QA>,
-    pub default: Option<Box<StatementOrExpression>>, // デフォルト値
+    pub default: Option<StatementOrExpression>, // デフォルト値
     pub loc: Option<Loc>,
 }
 
@@ -351,24 +353,24 @@ pub struct Identifier {
 // 関数呼び出し
 #[derive(Debug, PartialEq, Clone)]
 pub struct Call {
-    pub target: Box<Expression>, // 対象
-    pub args: Vec<Expression>,   // 引数
+    pub target: Expression,    // 対象
+    pub args: Vec<Expression>, // 引数
     pub loc: Option<Loc>,
 }
 
 // 配列要素アクセス
 #[derive(Debug, PartialEq, Clone)]
 pub struct Index {
-    pub target: Box<Expression>, // 対象
-    pub index: Box<Expression>,  // インデックス
+    pub target: Expression, // 対象
+    pub index: Expression,  // インデックス
     pub loc: Option<Loc>,
 }
 
 // プロパティアクセス
 #[derive(Debug, PartialEq, Clone)]
 pub struct Prop {
-    pub target: Box<Expression>, // 対象
-    pub name: String,            // プロパティ名
+    pub target: Expression, // 対象
+    pub name: String,       // プロパティ名
     pub loc: Option<Loc>,
 }
 
@@ -376,22 +378,22 @@ pub struct Prop {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TypeSource {
-    NamedTypeSource(NamedTypeSource),
-    FnTypeSource(FnTypeSource),
+    NamedTypeSource(Arc<NamedTypeSource>),
+    FnTypeSource(Arc<FnTypeSource>),
 }
 
 // 名前付き型
 #[derive(Debug, PartialEq, Clone)]
 pub struct NamedTypeSource {
-    pub name: String,                   // 型名
-    pub inner: Option<Box<TypeSource>>, // 内側の型
+    pub name: String,              // 型名
+    pub inner: Option<TypeSource>, // 内側の型
     pub loc: Option<Loc>,
 }
 
 // 関数の型
 #[derive(Debug, PartialEq, Clone)]
 pub struct FnTypeSource {
-    pub args: Vec<TypeSource>,   // 引数の型
-    pub result: Box<TypeSource>, // 戻り値の型
+    pub args: Vec<TypeSource>, // 引数の型
+    pub result: TypeSource,    // 戻り値の型
     pub loc: Option<Loc>,
 }
