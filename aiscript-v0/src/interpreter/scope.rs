@@ -9,7 +9,7 @@ use super::{value::Value, variable::Variable};
 
 #[derive(Clone, Debug, Default)]
 pub struct Scope {
-    parent: Option<Box<Scope>>,
+    parent: Option<Arc<Scope>>,
     states: Arc<RwLock<HashMap<String, Variable>>>,
     ns_name: Option<String>,
 }
@@ -33,7 +33,7 @@ impl Scope {
 
     pub fn create_child_scope(self, states: HashMap<String, Variable>) -> Self {
         Scope {
-            parent: Some(self.into()),
+            parent: Some(Arc::new(self)),
             states: Arc::new(RwLock::new(states)),
             ns_name: None,
         }
@@ -169,7 +169,7 @@ impl Scope {
     pub fn get_parent(self) -> Result<Scope, AiScriptError> {
         self.parent.map_or_else(
             || Err(AiScriptError::internal("scope has no parent")),
-            |parent| Ok(*parent),
+            |parent| Ok((*parent).clone()),
         )
     }
 }
