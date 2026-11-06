@@ -260,7 +260,8 @@ impl Interpreter {
                                             value,
                                         })
                                     })
-                                    .collect()
+                                    .collect::<Vec<Attr>>()
+                                    .into()
                             });
 
                             ns_scope.add(identifier.name.clone(), Variable::Const(value))?;
@@ -741,7 +742,8 @@ impl Interpreter {
                                 .filter_map(|ast::Attribute { name, value, .. }| {
                                     node_to_value(&value).map(|value| Attr { name, value })
                                 })
-                                .collect()
+                                .collect::<Vec<Attr>>()
+                                .into()
                         });
                         scope.define(&dest, value, mut_)?;
                         value_stack.push(Value::null());

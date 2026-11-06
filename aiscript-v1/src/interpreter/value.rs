@@ -145,7 +145,7 @@ pub struct Attr {
 #[derive(Clone, Debug, Default)]
 pub struct Value {
     pub value: V,
-    pub attr: Option<Vec<Attr>>,
+    pub attr: Option<Box<Vec<Attr>>>,
 }
 
 impl Value {
