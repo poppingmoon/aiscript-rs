@@ -585,7 +585,7 @@ impl std::fmt::Display for ReprValue<'_> {
             V::Fn(value) => write!(
                 f,
                 "@( {} ) {{ ... }}",
-                if let VFn::Fn { args, .. } = value {
+                if let VFn::UserFn { args, .. } = value {
                     args.join(", ")
                 } else {
                     String::new()

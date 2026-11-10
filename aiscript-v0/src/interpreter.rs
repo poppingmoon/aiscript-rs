@@ -295,7 +295,7 @@ impl Interpreter {
         args: impl IntoIterator<Item = Value>,
     ) -> BoxFuture<'_, Result<Value, AiScriptError>> {
         match fn_ {
-            VFn::Fn {
+            VFn::UserFn {
                 args: fn_args,
                 statements,
                 scope,
@@ -314,7 +314,7 @@ impl Interpreter {
                 }
                 .boxed()
             }
-            VFn::FnNative(fn_) => fn_(args.into_iter().collect(), self),
+            VFn::NativeFn(fn_) => fn_(args.into_iter().collect(), self),
         }
     }
 
@@ -954,7 +954,7 @@ impl Interpreter {
                     stack.push(Frame::Call2 { callee, args });
                 }
                 Frame::Call2 { callee, args } => match callee {
-                    VFn::Fn {
+                    VFn::UserFn {
                         args: fn_args,
                         statements,
                         scope: fn_scope,
@@ -970,7 +970,7 @@ impl Interpreter {
                         scope = fn_scope.create_child_scope(args);
                         stack.run(statements);
                     }
-                    VFn::FnNative(fn_) => {
+                    VFn::NativeFn(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);
                     }
                 },

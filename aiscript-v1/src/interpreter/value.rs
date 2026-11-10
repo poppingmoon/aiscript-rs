@@ -61,19 +61,19 @@ impl PartialEq for V {
             }
             (Self::Fn(l), Self::Fn(r)) => match (l, r) {
                 (
-                    VFn::Fn {
+                    VFn::UserFn {
                         params: l_params,
                         statements: l_statements,
                         scope: l_scope,
                     },
-                    VFn::Fn {
+                    VFn::UserFn {
                         params: r_params,
                         statements: r_statements,
                         scope: r_scope,
                     },
                 ) => l_params == r_params && l_statements == r_statements && l_scope == r_scope,
-                (VFn::FnNative(l), VFn::FnNative(r)) => Arc::ptr_eq(l, r),
-                (VFn::FnNativeSync(l), VFn::FnNativeSync(r)) => Arc::ptr_eq(l, r),
+                (VFn::NativeFn(l), VFn::NativeFn(r)) => Arc::ptr_eq(l, r),
+                (VFn::NativeSyncFn(l), VFn::NativeSyncFn(r)) => Arc::ptr_eq(l, r),
                 _ => false,
             },
             (Self::Return(l), Self::Return(r)) => l == r,
@@ -94,13 +94,13 @@ impl PartialEq for V {
 
 #[derive(Clone)]
 pub enum VFn {
-    Fn {
+    UserFn {
         params: Vec<VFnParam>,
         statements: Vec<StatementOrExpression>,
         scope: Box<Scope>,
     },
-    FnNative(VFnNative),
-    FnNativeSync(VFnNativeSync),
+    NativeFn(VNativeFn),
+    NativeSyncFn(VNativeSyncFn),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -109,18 +109,18 @@ pub struct VFnParam {
     pub default: Option<Value>,
 }
 
-pub type VFnNative = Arc<
+pub type VNativeFn = Arc<
     dyn Fn(Vec<Value>, &Interpreter) -> BoxFuture<'static, Result<Value, AiScriptError>>
         + Sync
         + Send,
 >;
 
-pub type VFnNativeSync = Arc<dyn Fn(Vec<Value>) -> Result<Value, AiScriptError> + Sync + Send>;
+pub type VNativeSyncFn = Arc<dyn Fn(Vec<Value>) -> Result<Value, AiScriptError> + Sync + Send>;
 
 impl std::fmt::Debug for VFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Fn {
+            Self::UserFn {
                 params,
                 statements,
                 scope,
@@ -130,8 +130,8 @@ impl std::fmt::Debug for VFn {
                 .field("statements", statements)
                 .field("scope", scope)
                 .finish(),
-            Self::FnNative(_) => f.debug_tuple("FnNative").finish(),
-            Self::FnNativeSync(_) => f.debug_tuple("FnNativeSync").finish(),
+            Self::NativeFn(_) => f.debug_tuple("NativeFn").finish(),
+            Self::NativeSyncFn(_) => f.debug_tuple("NativeSyncFn").finish(),
         }
     }
 }
@@ -187,7 +187,7 @@ impl Value {
         statements: impl IntoIterator<Item = StatementOrExpression>,
         scope: Scope,
     ) -> Self {
-        Value::new(V::Fn(VFn::Fn {
+        Value::new(V::Fn(VFn::UserFn {
             params: params.into_iter().collect(),
             statements: statements.into_iter().collect(),
             scope: scope.into(),
@@ -200,13 +200,13 @@ impl Value {
         + Send
         + 'static,
     ) -> Self {
-        Value::new(V::Fn(VFn::FnNative(Arc::new(value))))
+        Value::new(V::Fn(VFn::NativeFn(Arc::new(value))))
     }
 
     pub fn fn_native_sync(
         value: impl Fn(Vec<Value>) -> Result<Value, AiScriptError> + Sync + Send + 'static,
     ) -> Self {
-        Value::new(V::Fn(VFn::FnNativeSync(Arc::new(value))))
+        Value::new(V::Fn(VFn::NativeSyncFn(Arc::new(value))))
     }
 
     pub fn return_(value: Value) -> Self {

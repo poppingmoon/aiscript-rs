@@ -285,7 +285,7 @@ impl Interpreter {
         args: impl IntoIterator<Item = Value>,
     ) -> BoxFuture<'_, Result<Value, AiScriptError>> {
         match fn_ {
-            VFn::Fn {
+            VFn::UserFn {
                 params,
                 statements,
                 scope,
@@ -300,8 +300,8 @@ impl Interpreter {
                 }
                 async move { self.run(statements, &fn_scope).await.map(unwrap_ret) }.boxed()
             }
-            VFn::FnNative(fn_) => fn_(args.into_iter().collect(), self),
-            VFn::FnNativeSync(fn_) => {
+            VFn::NativeFn(fn_) => fn_(args.into_iter().collect(), self),
+            VFn::NativeSyncFn(fn_) => {
                 let result = fn_(args.into_iter().collect());
                 async { result }.boxed()
             }
@@ -1594,7 +1594,7 @@ impl Interpreter {
                     }
                 }
                 Frame::Call4 { callee, args } => match callee {
-                    VFn::Fn {
+                    VFn::UserFn {
                         params,
                         statements,
                         scope: fn_scope,
@@ -1609,10 +1609,10 @@ impl Interpreter {
                         }
                         stack.run(statements);
                     }
-                    VFn::FnNative(fn_) => {
+                    VFn::NativeFn(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);
                     }
-                    VFn::FnNativeSync(fn_) => {
+                    VFn::NativeSyncFn(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect())?);
                     }
                 },

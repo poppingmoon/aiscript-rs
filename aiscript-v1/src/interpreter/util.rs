@@ -591,7 +591,7 @@ impl std::fmt::Display for ReprValue<'_> {
             V::Bool(value) => write!(f, "{value}"),
             V::Null => write!(f, "null"),
             V::Fn(value) => match value {
-                VFn::Fn { params, .. } => write!(
+                VFn::UserFn { params, .. } => write!(
                     f,
                     "@( {} ) {{ ... }}",
                     params
@@ -606,7 +606,7 @@ impl std::fmt::Display for ReprValue<'_> {
                         .collect::<Vec<&str>>()
                         .join(", "),
                 ),
-                VFn::FnNative(_) | VFn::FnNativeSync(_) => write!(f, "@( ?? ) {{ native code }}"),
+                VFn::NativeFn(_) | VFn::NativeSyncFn(_) => write!(f, "@( ?? ) {{ native code }}"),
             },
             _ => write!(f, "?"),
         }

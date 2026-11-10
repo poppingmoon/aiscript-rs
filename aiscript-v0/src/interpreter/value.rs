@@ -69,15 +69,15 @@ impl PartialEq for V {
 
 #[derive(Clone)]
 pub enum VFn {
-    Fn {
+    UserFn {
         args: Vec<String>,
         statements: Vec<StatementOrExpression>,
         scope: Box<Scope>,
     },
-    FnNative(VFnNative),
+    NativeFn(VNativeFn),
 }
 
-pub type VFnNative = Arc<
+pub type VNativeFn = Arc<
     dyn Fn(Vec<Value>, &Interpreter) -> BoxFuture<'static, Result<Value, AiScriptError>>
         + Sync
         + Send,
@@ -86,7 +86,7 @@ pub type VFnNative = Arc<
 impl std::fmt::Debug for VFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Fn {
+            Self::UserFn {
                 args,
                 statements,
                 scope,
@@ -96,7 +96,7 @@ impl std::fmt::Debug for VFn {
                 .field("statements", statements)
                 .field("scope", scope)
                 .finish(),
-            Self::FnNative(_) => f.debug_tuple("FnNative").finish(),
+            Self::NativeFn(_) => f.debug_tuple("NativeFn").finish(),
         }
     }
 }
@@ -152,7 +152,7 @@ impl Value {
         statements: impl IntoIterator<Item = StatementOrExpression>,
         scope: Box<Scope>,
     ) -> Self {
-        Value::new(V::Fn(VFn::Fn {
+        Value::new(V::Fn(VFn::UserFn {
             args: args.into_iter().map(Into::into).collect(),
             statements: statements.into_iter().collect(),
             scope,
@@ -165,7 +165,7 @@ impl Value {
         + Send
         + 'static,
     ) -> Self {
-        Value::new(V::Fn(VFn::FnNative(Arc::new(value))))
+        Value::new(V::Fn(VFn::NativeFn(Arc::new(value))))
     }
 
     pub fn return_(value: Value) -> Self {
