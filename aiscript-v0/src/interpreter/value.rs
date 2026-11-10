@@ -69,12 +69,15 @@ impl PartialEq for V {
 
 #[derive(Clone)]
 pub enum VFn {
-    UserFn {
-        args: Vec<String>,
-        statements: Vec<StatementOrExpression>,
-        scope: Box<Scope>,
-    },
+    UserFn(Arc<VUserFn>),
     NativeFn(VNativeFn),
+}
+
+#[derive(Clone, Debug)]
+pub struct VUserFn {
+    pub args: Vec<String>,
+    pub statements: Vec<StatementOrExpression>,
+    pub scope: Box<Scope>,
 }
 
 pub type VNativeFn = Arc<
@@ -86,16 +89,7 @@ pub type VNativeFn = Arc<
 impl std::fmt::Debug for VFn {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UserFn {
-                args,
-                statements,
-                scope,
-            } => f
-                .debug_struct("Fn")
-                .field("args", args)
-                .field("statements", statements)
-                .field("scope", scope)
-                .finish(),
+            Self::UserFn(fn_) => fn_.fmt(f),
             Self::NativeFn(_) => f.debug_tuple("NativeFn").finish(),
         }
     }
@@ -152,11 +146,11 @@ impl Value {
         statements: impl IntoIterator<Item = StatementOrExpression>,
         scope: Box<Scope>,
     ) -> Self {
-        Value::new(V::Fn(VFn::UserFn {
+        Value::new(V::Fn(VFn::UserFn(Arc::new(VUserFn {
             args: args.into_iter().map(Into::into).collect(),
             statements: statements.into_iter().collect(),
             scope,
-        }))
+        }))))
     }
 
     pub fn fn_native(

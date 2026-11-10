@@ -284,20 +284,22 @@ impl Interpreter {
         args: impl IntoIterator<Item = Value>,
     ) -> BoxFuture<'_, Result<Value, AiScriptError>> {
         match fn_ {
-            VFn::UserFn {
-                params,
-                statements,
-                scope,
-            } => {
-                let fn_scope = scope.create_child_scope(HashMap::new());
-                for (param, arg) in zip(params, args.into_iter().map(Some).chain(repeat(None))) {
-                    let result = expect_any(arg.or(param.default))
+            VFn::UserFn(fn_) => {
+                let fn_scope = fn_.scope.clone().create_child_scope(HashMap::new());
+                for (param, arg) in zip(&fn_.params, args.into_iter().map(Some).chain(repeat(None)))
+                {
+                    let result = expect_any(arg.or_else(|| param.default.clone()))
                         .and_then(|arg| fn_scope.define(&param.dest, arg, true));
                     if let Err(e) = result {
                         return async { Err(e) }.boxed();
                     }
                 }
-                async move { self.run(statements, &fn_scope).await.map(unwrap_ret) }.boxed()
+                async move {
+                    self.run(fn_.statements.iter().cloned(), &fn_scope)
+                        .await
+                        .map(unwrap_ret)
+                }
+                .boxed()
             }
             VFn::NativeFn(fn_) => fn_(args.into_iter().collect(), self),
             VFn::NativeSyncFn(fn_) => {
@@ -1593,20 +1595,16 @@ impl Interpreter {
                     }
                 }
                 Frame::Call4 { callee, args } => match callee {
-                    VFn::UserFn {
-                        params,
-                        statements,
-                        scope: fn_scope,
-                    } => {
+                    VFn::UserFn(fn_) => {
                         stack.push(Frame::Call5 { scope });
-                        scope = fn_scope.create_child_scope(HashMap::new());
+                        scope = fn_.scope.clone().create_child_scope(HashMap::new());
                         for (param, arg) in
-                            zip(params, args.into_iter().map(Some).chain(repeat(None)))
+                            zip(&fn_.params, args.into_iter().map(Some).chain(repeat(None)))
                         {
-                            let arg = expect_any(arg.or(param.default))?;
+                            let arg = expect_any(arg.or_else(|| param.default.clone()))?;
                             scope.define(&param.dest, arg, true)?;
                         }
-                        stack.run(statements);
+                        stack.run(fn_.statements.iter().cloned());
                     }
                     VFn::NativeFn(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);

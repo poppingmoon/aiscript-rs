@@ -591,10 +591,10 @@ impl std::fmt::Display for ReprValue<'_> {
             V::Bool(value) => write!(f, "{value}"),
             V::Null => write!(f, "null"),
             V::Fn(value) => match value {
-                VFn::UserFn { params, .. } => write!(
+                VFn::UserFn(fn_) => write!(
                     f,
                     "@( {} ) {{ ... }}",
-                    params
+                    fn_.params
                         .iter()
                         .map(|param| {
                             if let ast::Expression::Identifier(identifier) = &param.dest {

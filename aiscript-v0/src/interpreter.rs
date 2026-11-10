@@ -294,22 +294,21 @@ impl Interpreter {
         args: impl IntoIterator<Item = Value>,
     ) -> BoxFuture<'_, Result<Value, AiScriptError>> {
         match fn_ {
-            VFn::UserFn {
-                args: fn_args,
-                statements,
-                scope,
-            } => {
+            VFn::UserFn(fn_) => {
                 let args = zip(
-                    fn_args,
+                    fn_.args.iter().cloned(),
                     args.into_iter()
                         .chain(repeat(Value::null()))
                         .map(Variable::Mut),
                 )
                 .collect();
                 async move {
-                    self.run(statements, &scope.create_child_scope(args))
-                        .await
-                        .map(unwrap_ret)
+                    self.run(
+                        fn_.statements.clone(),
+                        &fn_.scope.clone().create_child_scope(args),
+                    )
+                    .await
+                    .map(unwrap_ret)
                 }
                 .boxed()
             }
@@ -952,21 +951,17 @@ impl Interpreter {
                     stack.push(Frame::Call2 { callee, args });
                 }
                 Frame::Call2 { callee, args } => match callee {
-                    VFn::UserFn {
-                        args: fn_args,
-                        statements,
-                        scope: fn_scope,
-                    } => {
+                    VFn::UserFn(fn_) => {
                         let args = zip(
-                            fn_args,
+                            fn_.args.iter().cloned(),
                             args.into_iter()
                                 .chain(repeat(Value::null()))
                                 .map(Variable::Mut),
                         )
                         .collect();
                         stack.push(Frame::Call3 { scope });
-                        scope = fn_scope.create_child_scope(args);
-                        stack.run(statements);
+                        scope = fn_.scope.clone().create_child_scope(args);
+                        stack.run(fn_.statements.iter().cloned());
                     }
                     VFn::NativeFn(fn_) => {
                         value_stack.push(fn_(args.into_iter().collect(), self).await?);
