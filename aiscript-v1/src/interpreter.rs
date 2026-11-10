@@ -1319,7 +1319,7 @@ impl Interpreter {
                         qs.reverse();
                         stack.push(Frame::Match2 {
                             label,
-                            about,
+                            about: about.into(),
                             qs,
                             default,
                         });
@@ -1365,7 +1365,7 @@ impl Interpreter {
                     let q = value_stack.pop_value()?;
                     if q.is_control() {
                         value_stack.push(q);
-                    } else if about == q {
+                    } else if *about == q {
                         let is_statement = matches!(a, ast::StatementOrExpression::Statement(_));
                         if is_statement {
                             scope = scope.create_child_scope(HashMap::new());

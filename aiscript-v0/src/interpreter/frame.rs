@@ -116,12 +116,12 @@ pub enum Frame {
         default: Option<StatementOrExpression>,
     },
     Match2 {
-        about: Value,
+        about: Box<Value>,
         qs: Vec<QA>,
         default: Option<StatementOrExpression>,
     },
     Match3 {
-        about: Value,
+        about: Box<Value>,
         a: StatementOrExpression,
         qs: Vec<QA>,
         default: Option<StatementOrExpression>,

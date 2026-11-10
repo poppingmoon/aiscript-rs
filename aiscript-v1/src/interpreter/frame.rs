@@ -146,13 +146,13 @@ pub enum Frame {
     },
     Match2 {
         label: Option<String>,
-        about: Value,
+        about: Box<Value>,
         qs: Vec<QA>,
         default: Option<StatementOrExpression>,
     },
     Match3 {
         label: Option<String>,
-        about: Value,
+        about: Box<Value>,
         a: StatementOrExpression,
         qs: Vec<QA>,
         default: Option<StatementOrExpression>,

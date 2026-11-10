@@ -839,7 +839,11 @@ impl Interpreter {
                 Frame::Match1 { mut qs, default } => {
                     let about = value_stack.pop_value()?;
                     qs.reverse();
-                    stack.push(Frame::Match2 { about, qs, default });
+                    stack.push(Frame::Match2 {
+                        about: about.into(),
+                        qs,
+                        default,
+                    });
                 }
                 Frame::Match2 {
                     about,
@@ -867,7 +871,7 @@ impl Interpreter {
                     default,
                 } => {
                     let q = value_stack.pop_value()?;
-                    if about == q {
+                    if *about == q {
                         stack.eval(a);
                     } else {
                         stack.push(Frame::Match2 { about, qs, default });
