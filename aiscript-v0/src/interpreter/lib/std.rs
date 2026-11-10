@@ -255,27 +255,25 @@ pub fn std() -> HashMap<String, Value> {
             let mut args = args.into_iter();
             let result = f64::try_from(args.next().unwrap_or_default()).and_then(|a| {
                 let b = f64::try_from(args.next().unwrap_or_default())?;
-                Ok(Value::arr(if a < b {
+                Ok(if a < b {
                     let length = (b - a).floor() + 1.0;
                     let mut i = 0.0;
-                    std::iter::from_fn(move || {
+                    Value::arr(std::iter::from_fn(move || {
                         let v = if i < length { Value::num(a + i) } else { None? };
                         i += 1.0;
                         Some(v)
-                    })
-                    .collect()
+                    }))
                 } else if a > b {
                     let length = (a - b).floor() + 1.0;
                     let mut i = 0.0;
-                    std::iter::from_fn(move || {
+                    Value::arr(std::iter::from_fn(move || {
                         let v = if i < length { Value::num(a - i) } else { None? };
                         i += 1.0;
                         Some(v)
-                    })
-                    .collect()
+                    }))
                 } else {
-                    vec![Value::num(a)]
-                }))
+                    Value::arr([Value::num(a)])
+                })
             });
             async { result }.boxed()
         }),

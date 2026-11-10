@@ -6172,7 +6172,7 @@ mod std {
                 "#,
                 |res| {
                     let res = <Vec<Value>>::try_from(res).unwrap();
-                    assert_eq!(res[..4], vec![num(0), num(0), num(0), num(0)]);
+                    assert_eq!(res[..4], [num(0), num(0), num(0), num(0)]);
                     assert!(f64::try_from(res[4].clone()).unwrap().is_nan())
                 },
             )

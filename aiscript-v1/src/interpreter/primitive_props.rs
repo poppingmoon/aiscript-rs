@@ -458,8 +458,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     Ok(Value::arr(
                         try_join_all(target.into_iter().enumerate().map(|(i, item)| {
-                            interpreter
-                                .exec_fn_simple(fn_.clone(), vec![item, Value::num(i as f64)])
+                            interpreter.exec_fn_simple(fn_.clone(), [item, Value::num(i as f64)])
                         }))
                         .await?,
                     ))
@@ -480,7 +479,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     for (i, item) in target.into_iter().enumerate() {
                         let res = interpreter
-                            .exec_fn_simple(fn_.clone(), vec![item.clone(), Value::num(i as f64)])
+                            .exec_fn_simple(fn_.clone(), [item.clone(), Value::num(i as f64)])
                             .await?;
                         let res = bool::try_from(res)?;
                         if res {
@@ -517,7 +516,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                         accumlator = interpreter
                             .exec_fn_simple(
                                 fn_.clone(),
-                                vec![
+                                [
                                     accumlator,
                                     item,
                                     Value::num(if with_initial_value { i } else { i + 1 } as f64),
@@ -545,7 +544,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     for (i, item) in target.into_iter().enumerate() {
                         let res = interpreter
-                            .exec_fn_simple(fn_.clone(), vec![item.clone(), Value::num(i as f64)])
+                            .exec_fn_simple(fn_.clone(), [item.clone(), Value::num(i as f64)])
                             .await?;
                         let res = bool::try_from(res)?;
                         if res {
@@ -636,7 +635,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                     let mut r = right.next().unwrap();
                     loop {
                         let comp_value = interpreter
-                            .exec_fn_simple(comp.clone(), vec![l.clone(), r.clone()])
+                            .exec_fn_simple(comp.clone(), [l.clone(), r.clone()])
                             .await?;
                         let comp_value = f64::try_from(comp_value)?;
                         if comp_value <= 0.0 {
@@ -837,8 +836,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     let mapped_vals =
                         try_join_all(target.into_iter().enumerate().map(|(i, item)| {
-                            interpreter
-                                .exec_fn_simple(fn_.clone(), vec![item, Value::num(i as f64)])
+                            interpreter.exec_fn_simple(fn_.clone(), [item, Value::num(i as f64)])
                         }))
                         .await?;
                     let mut result = Vec::new();
@@ -869,7 +867,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     for (i, item) in target.into_iter().enumerate() {
                         let res = interpreter
-                            .exec_fn_simple(fn_.clone(), vec![item, Value::num(i as f64)])
+                            .exec_fn_simple(fn_.clone(), [item, Value::num(i as f64)])
                             .await?;
                         let res = bool::try_from(res)?;
                         if !res {
@@ -896,7 +894,7 @@ pub fn get_prim_prop(target: Value, name: &str) -> Result<Value, AiScriptError> 
                 async move {
                     for (i, item) in target.into_iter().enumerate() {
                         let res = interpreter
-                            .exec_fn_simple(fn_.clone(), vec![item, Value::num(i as f64)])
+                            .exec_fn_simple(fn_.clone(), [item, Value::num(i as f64)])
                             .await?;
                         let res = bool::try_from(res)?;
                         if res {
