@@ -277,9 +277,8 @@ impl Interpreter {
                             definition.name,
                         )))?;
                     } else {
-                        let variable = Variable::Const(
-                            self.run(vec![definition.expr.clone()], &ns_scope).await?,
-                        );
+                        let variable =
+                            Variable::Const(self.run([definition.expr.clone()], &ns_scope).await?);
                         ns_scope.add(&definition.name, variable)?;
                     }
                 }
@@ -320,7 +319,7 @@ impl Interpreter {
 
     pub async fn run(
         &self,
-        program: Vec<impl Into<Frame>>,
+        program: impl IntoIterator<Item: Into<Frame>, IntoIter: DoubleEndedIterator>,
         scope: &Scope,
     ) -> Result<Value, AiScriptError> {
         let mut stack = Vec::new();
@@ -448,7 +447,7 @@ impl Interpreter {
                         ast::Expression::Block(block) => {
                             scope = scope.create_child_scope(HashMap::new());
                             stack.push(Frame::Block);
-                            stack.run(block.statements.clone());
+                            stack.run(block.statements.iter().cloned());
                         }
                         ast::Expression::Exists(exists) => {
                             let exists = scope.exists(&exists.identifier.name)?;
@@ -481,7 +480,7 @@ impl Interpreter {
                                 arr.value
                                     .clone()
                                     .into_iter()
-                                    .map(|expr| self.run(vec![expr], &scope)),
+                                    .map(|expr| self.run([expr], &scope)),
                             )
                             .await?;
                             value_stack.push(Value::arr(arr));
@@ -709,7 +708,7 @@ impl Interpreter {
                         try_join_all(arr.value.clone().into_iter().enumerate().map(
                             |(index, item)| {
                                 self.run(
-                                    vec![Frame::Assign2 {
+                                    [Frame::Assign2 {
                                         dest: item,
                                         value: value.get(index).cloned().unwrap_or_default(),
                                     }],
@@ -724,7 +723,7 @@ impl Interpreter {
                         let value = <IndexMap<String, Value>>::try_from(value)?;
                         try_join_all(obj.value.clone().into_iter().map(|(key, item)| {
                             self.run(
-                                vec![Frame::Assign2 {
+                                [Frame::Assign2 {
                                     dest: item,
                                     value: value.get(&key).cloned().unwrap_or_default(),
                                 }],
@@ -949,8 +948,7 @@ impl Interpreter {
                     let callee = value_stack.pop_value()?;
                     let callee = VFn::try_from(callee)?;
                     let args =
-                        try_join_all(args.into_iter().map(|arg| self.run(vec![arg], &scope)))
-                            .await?;
+                        try_join_all(args.into_iter().map(|arg| self.run([arg], &scope))).await?;
                     stack.push(Frame::Call2 { callee, args });
                 }
                 Frame::Call2 { callee, args } => match callee {

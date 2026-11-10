@@ -3,7 +3,7 @@ use crate::{error::AiScriptError, interpreter::frame::Frame, values::Value};
 pub trait StackExt {
     fn eval(&mut self, node: impl Into<Frame>);
 
-    fn run(&mut self, program: Vec<impl Into<Frame>>);
+    fn run(&mut self, program: impl IntoIterator<Item: Into<Frame>, IntoIter: DoubleEndedIterator>);
 }
 
 impl StackExt for Vec<Frame> {
@@ -11,7 +11,10 @@ impl StackExt for Vec<Frame> {
         self.push(node.into());
     }
 
-    fn run(&mut self, program: Vec<impl Into<Frame>>) {
+    fn run(
+        &mut self,
+        program: impl IntoIterator<Item: Into<Frame>, IntoIter: DoubleEndedIterator>,
+    ) {
         self.push(Frame::Run);
         let mut program = program.into_iter().rev();
         if let Some(node) = program.next() {

@@ -249,8 +249,7 @@ impl Interpreter {
                                 pos: definition.loc.start.clone(),
                             })?;
                         } else {
-                            let mut value =
-                                self.run(vec![definition.expr.clone()], &ns_scope).await?;
+                            let mut value = self.run([definition.expr.clone()], &ns_scope).await?;
 
                             value.attr = definition.attr.as_ref().map(|attr| {
                                 attr.iter()
@@ -310,7 +309,7 @@ impl Interpreter {
 
     pub async fn run(
         &self,
-        program: Vec<impl Into<Frame>>,
+        program: impl IntoIterator<Item: Into<Frame>, IntoIter: DoubleEndedIterator>,
         scope: &Scope,
     ) -> Result<Value, AiScriptError> {
         let mut stack = Vec::new();
@@ -479,7 +478,7 @@ impl Interpreter {
                                 Ok::<VFnParam, AiScriptError>(VFnParam {
                                     dest: param.dest.clone(),
                                     default: if let Some(default) = param.default.clone() {
-                                        Some(self.run(vec![default], &scope).await?)
+                                        Some(self.run([default], &scope).await?)
                                     } else if param.optional {
                                         Some(Value::null())
                                     } else {
@@ -525,7 +524,7 @@ impl Interpreter {
                             stack.push(Frame::Block {
                                 label: label.clone(),
                             });
-                            stack.run(statements.clone());
+                            stack.run(statements.iter().cloned());
                         }
                         ast::Expression::Exists(exists) => {
                             let exists = scope.exists(&exists.identifier.name)?;
