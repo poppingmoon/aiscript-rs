@@ -1491,7 +1491,7 @@ impl Interpreter {
                     if right.is_control() {
                         value_stack.push(right);
                     } else {
-                        stack.push(Frame::Call4 {
+                        stack.push(Frame::Call3 {
                             callee,
                             args: vec![left, right],
                         })
@@ -1549,37 +1549,26 @@ impl Interpreter {
                         value_stack.push(callee);
                     } else {
                         let callee = VFn::try_from(callee)?;
-                        let len = args.len();
                         args.reverse();
-                        stack.push(Frame::Call2 {
-                            callee,
-                            args,
-                            value: Vec::with_capacity(len),
-                        });
+                        if let Some(arg) = args.pop() {
+                            let len = args.len() + 1;
+                            stack.push(Frame::Call2 {
+                                callee,
+                                args,
+                                value: Vec::with_capacity(len),
+                            });
+                            stack.eval(arg);
+                        } else {
+                            stack.push(Frame::Call3 {
+                                callee,
+                                args: Vec::new(),
+                            })
+                        }
                     }
                 }
                 Frame::Call2 {
                     callee,
                     mut args,
-                    value,
-                } => {
-                    if let Some(arg) = args.pop() {
-                        stack.push(Frame::Call3 {
-                            callee,
-                            args,
-                            value,
-                        });
-                        stack.eval(arg);
-                    } else {
-                        stack.push(Frame::Call4 {
-                            callee,
-                            args: value,
-                        });
-                    }
-                }
-                Frame::Call3 {
-                    callee,
-                    args,
                     mut value,
                 } => {
                     let arg = value_stack.pop_value()?;
@@ -1587,16 +1576,24 @@ impl Interpreter {
                         value_stack.push(arg);
                     } else {
                         value.push(arg);
-                        stack.push(Frame::Call2 {
-                            callee,
-                            args,
-                            value,
-                        });
+                        if let Some(arg) = args.pop() {
+                            stack.push(Frame::Call2 {
+                                callee,
+                                args,
+                                value,
+                            });
+                            stack.eval(arg);
+                        } else {
+                            stack.push(Frame::Call3 {
+                                callee,
+                                args: value,
+                            });
+                        }
                     }
                 }
-                Frame::Call4 { callee, args } => match callee {
+                Frame::Call3 { callee, args } => match callee {
                     VFn::UserFn(fn_) => {
-                        stack.push(Frame::Call5 { scope });
+                        stack.push(Frame::Call4 { scope });
                         scope = fn_.scope.clone().create_child_scope(HashMap::new());
                         for (param, arg) in
                             zip(&fn_.params, args.into_iter().map(Some).chain(repeat(None)))
@@ -1613,7 +1610,7 @@ impl Interpreter {
                         value_stack.push(fn_(args.into_iter().collect())?);
                     }
                 },
-                Frame::Call5 {
+                Frame::Call4 {
                     scope: previous_scope,
                 } => {
                     scope = previous_scope;

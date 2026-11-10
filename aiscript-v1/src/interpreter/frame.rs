@@ -218,14 +218,9 @@ pub enum Frame {
     },
     Call3 {
         callee: VFn,
-        args: Vec<Expression>,
-        value: Vec<Value>,
-    },
-    Call4 {
-        callee: VFn,
         args: Vec<Value>,
     },
-    Call5 {
+    Call4 {
         scope: Scope,
     },
     Index1 {
