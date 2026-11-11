@@ -1310,4 +1310,16 @@ mod template_syntax {
         .await
         .unwrap();
     }
+
+    #[tokio::test]
+    async fn literal() {
+        test(
+            r#"
+            <: `{"a"} {'b'} {1} {-1.2} {true} {null}`
+            "#,
+            |res| assert_eq!(res, str("a b 1 -1.2 true null")),
+        )
+        .await
+        .unwrap();
+    }
 }

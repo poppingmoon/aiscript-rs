@@ -2,6 +2,7 @@
 
 use std::{
     collections::HashMap,
+    fmt::Write,
     iter::{repeat, repeat_with, zip},
     sync::{
         Arc,
@@ -535,14 +536,30 @@ impl Interpreter {
                         ast::Expression::Tmpl(tmpl) => {
                             let mut tmpl = tmpl.tmpl.clone();
                             tmpl.reverse();
-                            if let Some(x) = tmpl.pop() {
-                                stack.push(Frame::Tmpl {
-                                    tmpl,
-                                    str: String::new(),
-                                });
-                                stack.eval(x)
-                            } else {
-                                value_stack.push(Value::str(String::new()))
+                            let mut str = String::new();
+                            loop {
+                                if let Some(x) = tmpl.pop() {
+                                    match x {
+                                        ast::Expression::Str(s) => str += &s.value,
+                                        ast::Expression::Num(num) => {
+                                            write!(str, "{}", num.value)
+                                                .map_err(AiScriptError::internal)?
+                                        }
+                                        ast::Expression::Bool(bool) => {
+                                            write!(str, "{}", bool.value)
+                                                .map_err(AiScriptError::internal)?
+                                        }
+                                        ast::Expression::Null(_) => str += "null",
+                                        _ => {
+                                            stack.push(Frame::Tmpl { tmpl, str });
+                                            stack.eval(x);
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    value_stack.push(Value::str(str));
+                                    break;
+                                }
                             }
                         }
                         ast::Expression::Str(str) => {
@@ -1421,11 +1438,25 @@ impl Interpreter {
                         value_stack.push(v);
                     } else {
                         str += &v.repr_value().to_string();
-                        if let Some(x) = tmpl.pop() {
-                            stack.push(Frame::Tmpl { tmpl, str });
-                            stack.eval(x);
-                        } else {
-                            value_stack.push(Value::str(str));
+                        loop {
+                            if let Some(x) = tmpl.pop() {
+                                match x {
+                                    ast::Expression::Str(s) => str += &s.value,
+                                    ast::Expression::Num(num) => write!(str, "{}", num.value)
+                                        .map_err(AiScriptError::internal)?,
+                                    ast::Expression::Bool(bool) => write!(str, "{}", bool.value)
+                                        .map_err(AiScriptError::internal)?,
+                                    ast::Expression::Null(_) => str += "null",
+                                    _ => {
+                                        stack.push(Frame::Tmpl { tmpl, str });
+                                        stack.eval(x);
+                                        break;
+                                    }
+                                }
+                            } else {
+                                value_stack.push(Value::str(str));
+                                break;
+                            }
                         }
                     }
                 }
