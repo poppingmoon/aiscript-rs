@@ -535,10 +535,15 @@ impl Interpreter {
                         ast::Expression::Tmpl(tmpl) => {
                             let mut tmpl = tmpl.tmpl.clone();
                             tmpl.reverse();
-                            stack.push(Frame::Tmpl1 {
-                                tmpl,
-                                str: String::new(),
-                            });
+                            if let Some(x) = tmpl.pop() {
+                                stack.push(Frame::Tmpl {
+                                    tmpl,
+                                    str: String::new(),
+                                });
+                                stack.eval(x)
+                            } else {
+                                value_stack.push(Value::str(String::new()))
+                            }
                         }
                         ast::Expression::Str(str) => {
                             value_stack.push(Value::str(str.value.clone()))
@@ -548,21 +553,32 @@ impl Interpreter {
                         ast::Expression::Null(_) => value_stack.push(Value::null()),
                         ast::Expression::Obj(obj) => {
                             let mut obj = obj.value.clone();
-                            let len = obj.len();
                             obj.reverse();
-                            stack.push(Frame::Obj1 {
-                                obj: obj.into(),
-                                value: IndexMap::with_capacity(len).into(),
-                            });
+                            if let Some((k, v)) = obj.pop() {
+                                let len = obj.len() + 1;
+                                stack.push(Frame::Obj {
+                                    obj: obj.into(),
+                                    value: IndexMap::with_capacity(len).into(),
+                                    k,
+                                });
+                                stack.eval(v);
+                            } else {
+                                value_stack.push(Value::obj([] as [(String, Value); 0]));
+                            }
                         }
                         ast::Expression::Arr(arr) => {
                             let mut arr = arr.value.clone();
-                            let len = arr.len();
                             arr.reverse();
-                            stack.push(Frame::Arr1 {
-                                arr,
-                                value: Vec::with_capacity(len),
-                            })
+                            if let Some(v) = arr.pop() {
+                                let len = arr.len() + 1;
+                                stack.push(Frame::Arr {
+                                    arr,
+                                    value: Vec::with_capacity(len),
+                                });
+                                stack.eval(v);
+                            } else {
+                                value_stack.push(Value::arr([]));
+                            }
                         }
                         ast::Expression::Plus(plus) => {
                             stack.push(Frame::Plus);
@@ -1399,55 +1415,50 @@ impl Interpreter {
                     let value = value_stack.pop_value()?;
                     value_stack.push(unwrap_labeled_break(value, label));
                 }
-                Frame::Tmpl1 { mut tmpl, str } => {
-                    if let Some(x) = tmpl.pop() {
-                        stack.push(Frame::Tmpl2 { tmpl, str });
-                        stack.eval(x);
-                    } else {
-                        value_stack.push(Value::str(str));
-                    }
-                }
-                Frame::Tmpl2 { tmpl, mut str } => {
+                Frame::Tmpl { mut tmpl, mut str } => {
                     let v = value_stack.pop_value()?;
                     if v.is_control() {
                         value_stack.push(v);
                     } else {
                         str += &v.repr_value().to_string();
-                        stack.push(Frame::Tmpl1 { tmpl, str });
+                        if let Some(x) = tmpl.pop() {
+                            stack.push(Frame::Tmpl { tmpl, str });
+                            stack.eval(x);
+                        } else {
+                            value_stack.push(Value::str(str));
+                        }
                     }
                 }
-                Frame::Obj1 { mut obj, value } => {
-                    if let Some((k, v)) = obj.pop() {
-                        stack.push(Frame::Obj2 { obj, value, k });
-                        stack.eval(v);
-                    } else {
-                        value_stack.push(Value::obj(*value));
-                    }
-                }
-                Frame::Obj2 { obj, mut value, k } => {
+                Frame::Obj {
+                    mut obj,
+                    mut value,
+                    k,
+                } => {
                     let v = value_stack.pop_value()?;
                     if v.is_control() {
                         value_stack.push(v);
                     } else {
                         value.insert(k, v);
-                        stack.push(Frame::Obj1 { obj, value });
+                        if let Some((k, v)) = obj.pop() {
+                            stack.push(Frame::Obj { obj, value, k });
+                            stack.eval(v);
+                        } else {
+                            value_stack.push(Value::obj(*value));
+                        }
                     }
                 }
-                Frame::Arr1 { mut arr, value } => {
-                    if let Some(v) = arr.pop() {
-                        stack.push(Frame::Arr2 { arr, value });
-                        stack.eval(v);
-                    } else {
-                        value_stack.push(Value::arr(value));
-                    }
-                }
-                Frame::Arr2 { arr, mut value } => {
+                Frame::Arr { mut arr, mut value } => {
                     let v = value_stack.pop_value()?;
                     if v.is_control() {
                         value_stack.push(v);
                     } else {
                         value.push(v);
-                        stack.push(Frame::Arr1 { arr, value });
+                        if let Some(v) = arr.pop() {
+                            stack.push(Frame::Arr { arr, value });
+                            stack.eval(v);
+                        } else {
+                            value_stack.push(Value::arr(value));
+                        }
                     }
                 }
                 Frame::Plus => {

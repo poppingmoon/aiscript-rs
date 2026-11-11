@@ -127,19 +127,11 @@ pub enum Frame {
         default: Option<StatementOrExpression>,
     },
     Block,
-    Tmpl1 {
+    Tmpl {
         tmpl: Vec<StringOrExpression>,
         str: String,
     },
-    Tmpl2 {
-        tmpl: Vec<StringOrExpression>,
-        str: String,
-    },
-    Obj1 {
-        obj: Box<IndexMap<String, Expression>>,
-        map: Box<IndexMap<String, Value>>,
-    },
-    Obj2 {
+    Obj {
         obj: Box<IndexMap<String, Expression>>,
         map: Box<IndexMap<String, Value>>,
         k: String,

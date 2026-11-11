@@ -455,10 +455,22 @@ impl Interpreter {
                         ast::Expression::Tmpl(tmpl) => {
                             let mut tmpl = tmpl.tmpl.clone();
                             tmpl.reverse();
-                            stack.push(Frame::Tmpl1 {
-                                tmpl,
-                                str: String::new(),
-                            });
+                            let mut str = String::new();
+                            loop {
+                                if let Some(x) = tmpl.pop() {
+                                    match x {
+                                        ast::StringOrExpression::String(x) => str += &x,
+                                        ast::StringOrExpression::Expression(x) => {
+                                            stack.push(Frame::Tmpl { tmpl, str });
+                                            stack.eval(x);
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    value_stack.push(Value::str(str));
+                                    break;
+                                }
+                            }
                         }
                         ast::Expression::Str(str) => {
                             value_stack.push(Value::str(str.value.clone()))
@@ -469,10 +481,17 @@ impl Interpreter {
                         ast::Expression::Obj(obj) => {
                             let mut obj = obj.value.clone();
                             obj.reverse();
-                            stack.push(Frame::Obj1 {
-                                obj: obj.into(),
-                                map: IndexMap::new().into(),
-                            });
+                            if let Some((k, v)) = obj.pop() {
+                                let len = obj.len() + 1;
+                                stack.push(Frame::Obj {
+                                    obj: obj.into(),
+                                    map: IndexMap::with_capacity(len).into(),
+                                    k,
+                                });
+                                stack.eval(v);
+                            } else {
+                                value_stack.push(Value::obj([] as [(String, Value); 0]))
+                            }
                         }
                         ast::Expression::Arr(arr) => {
                             let arr = try_join_all(
@@ -878,39 +897,38 @@ impl Interpreter {
                     }
                 }
                 Frame::Block => scope = scope.get_parent()?,
-                Frame::Tmpl1 { mut tmpl, mut str } => {
-                    if let Some(x) = tmpl.pop() {
-                        match x {
-                            ast::StringOrExpression::String(x) => {
-                                str += &x;
-                                stack.push(Frame::Tmpl1 { tmpl, str });
-                            }
-                            ast::StringOrExpression::Expression(x) => {
-                                stack.push(Frame::Tmpl2 { tmpl, str });
-                                stack.eval(x);
-                            }
-                        }
-                    } else {
-                        value_stack.push(Value::str(str));
-                    }
-                }
-                Frame::Tmpl2 { tmpl, mut str } => {
+                Frame::Tmpl { mut tmpl, mut str } => {
                     let v = value_stack.pop_value()?;
                     str += &v.repr_value().to_string();
-                    stack.push(Frame::Tmpl1 { tmpl, str });
+                    loop {
+                        if let Some(x) = tmpl.pop() {
+                            match x {
+                                ast::StringOrExpression::String(x) => str += &x,
+                                ast::StringOrExpression::Expression(x) => {
+                                    stack.push(Frame::Tmpl { tmpl, str });
+                                    stack.eval(x);
+                                    break;
+                                }
+                            }
+                        } else {
+                            value_stack.push(Value::str(str));
+                            break;
+                        }
+                    }
                 }
-                Frame::Obj1 { mut obj, map } => {
+                Frame::Obj {
+                    mut obj,
+                    mut map,
+                    k,
+                } => {
+                    let v = value_stack.pop_value()?;
+                    map.insert(k, v);
                     if let Some((k, v)) = obj.pop() {
-                        stack.push(Frame::Obj2 { obj, map, k });
+                        stack.push(Frame::Obj { obj, map, k });
                         stack.eval(v);
                     } else {
                         value_stack.push(Value::obj(*map));
                     }
-                }
-                Frame::Obj2 { obj, mut map, k } => {
-                    let v = value_stack.pop_value()?;
-                    map.insert(k, v);
-                    stack.push(Frame::Obj1 { obj, map });
                 }
                 Frame::Not => {
                     let v = value_stack.pop_value()?;

@@ -164,28 +164,16 @@ pub enum Frame {
     Block {
         label: Option<String>,
     },
-    Tmpl1 {
+    Tmpl {
         tmpl: Vec<Expression>,
         str: String,
     },
-    Tmpl2 {
-        tmpl: Vec<Expression>,
-        str: String,
-    },
-    Obj1 {
-        obj: Box<IndexMap<String, Expression>>,
-        value: Box<IndexMap<String, Value>>,
-    },
-    Obj2 {
+    Obj {
         obj: Box<IndexMap<String, Expression>>,
         value: Box<IndexMap<String, Value>>,
         k: String,
     },
-    Arr1 {
-        arr: Vec<Expression>,
-        value: Vec<Value>,
-    },
-    Arr2 {
+    Arr {
         arr: Vec<Expression>,
         value: Vec<Value>,
     },
