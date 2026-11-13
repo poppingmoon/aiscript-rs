@@ -286,7 +286,7 @@ impl Interpreter {
     ) -> BoxFuture<'_, Result<Value, AiScriptError>> {
         match fn_ {
             VFn::UserFn(fn_) => {
-                let fn_scope = fn_.scope.clone().create_child_scope(HashMap::new());
+                let fn_scope = (*fn_.scope).clone().create_child_scope(HashMap::new());
                 for (param, arg) in zip(&fn_.params, args.into_iter().map(Some).chain(repeat(None)))
                 {
                     let result = expect_any(arg.or_else(|| param.default.clone()))
@@ -1636,7 +1636,7 @@ impl Interpreter {
                 Frame::Call3 { callee, args } => match callee {
                     VFn::UserFn(fn_) => {
                         stack.push(Frame::Call4 { scope });
-                        scope = fn_.scope.clone().create_child_scope(HashMap::new());
+                        scope = (*fn_.scope).clone().create_child_scope(HashMap::new());
                         for (param, arg) in
                             zip(&fn_.params, args.into_iter().map(Some).chain(repeat(None)))
                         {

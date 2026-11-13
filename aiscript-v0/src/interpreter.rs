@@ -305,7 +305,7 @@ impl Interpreter {
                 async move {
                     self.run(
                         fn_.statements.clone(),
-                        &fn_.scope.clone().create_child_scope(args),
+                        &(*fn_.scope).clone().create_child_scope(args),
                     )
                     .await
                     .map(unwrap_ret)
@@ -982,7 +982,7 @@ impl Interpreter {
                         )
                         .collect();
                         stack.push(Frame::Call3 { scope });
-                        scope = fn_.scope.clone().create_child_scope(args);
+                        scope = (*fn_.scope).clone().create_child_scope(args);
                         stack.run(fn_.statements.iter().cloned());
                     }
                     VFn::NativeFn(fn_) => {
