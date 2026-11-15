@@ -58,7 +58,12 @@ fn arr(value: impl IntoIterator<Item = Value>) -> Value {
 }
 
 fn obj(value: impl IntoIterator<Item = (impl Into<String>, Value)>) -> Value {
-    Value::obj(value)
+    Value::obj(
+        value
+            .into_iter()
+            .map(|(key, value)| (key.into(), value))
+            .collect::<IndexMap<String, Value>>(),
+    )
 }
 
 fn error(value: impl Into<String>, info: Option<Value>) -> Value {

@@ -132,13 +132,8 @@ impl Value {
         Value::new(V::Arr(Arc::new(RwLock::new(value.into_iter().collect()))))
     }
 
-    pub fn obj(value: impl IntoIterator<Item = (impl Into<String>, Value)>) -> Self {
-        Value::new(V::Obj(Arc::new(RwLock::new(
-            value
-                .into_iter()
-                .map(|(key, value)| (key.into(), value))
-                .collect(),
-        ))))
+    pub fn obj(value: impl Into<IndexMap<String, Value>>) -> Self {
+        Value::new(V::Obj(Arc::new(RwLock::new(value.into()))))
     }
 
     pub fn fn_(

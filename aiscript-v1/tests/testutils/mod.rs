@@ -60,7 +60,12 @@ pub fn arr(value: impl IntoIterator<Item = Value>) -> Value {
 
 #[allow(dead_code)]
 pub fn obj(value: impl IntoIterator<Item = (impl Into<String>, Value)>) -> Value {
-    Value::obj(value)
+    Value::obj(
+        value
+            .into_iter()
+            .map(|(key, value)| (key.into(), value))
+            .collect::<IndexMap<String, Value>>(),
+    )
 }
 
 #[allow(dead_code)]

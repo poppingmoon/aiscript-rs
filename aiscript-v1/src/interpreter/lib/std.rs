@@ -1356,7 +1356,7 @@ pub fn std() -> HashMap<String, Value> {
                             let value = obj.get(&key).cloned().unwrap_or_default();
                             Ok((key, value))
                         })
-                        .collect::<Result<Vec<(String, Value)>, AiScriptError>>()?,
+                        .collect::<Result<IndexMap<String, Value>, AiScriptError>>()?,
                 ))
             })
         }),
@@ -1374,7 +1374,7 @@ pub fn std() -> HashMap<String, Value> {
                             let value = expect_any(kv.next())?;
                             Ok((key, value))
                         })
-                        .collect::<Result<Vec<(String, Value)>, AiScriptError>>()?,
+                        .collect::<Result<IndexMap<String, Value>, AiScriptError>>()?,
                 ))
             })
         }),

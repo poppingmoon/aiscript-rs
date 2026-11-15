@@ -183,7 +183,7 @@ impl Interpreter {
                     let mut map = IndexMap::new();
                     for (k, v) in &obj.value {
                         if let Some(value) = node_to_value(v) {
-                            map.insert(k, value);
+                            map.insert(k.clone(), value);
                         }
                     }
                     map
