@@ -6,7 +6,9 @@ use nom::{
         anychar,
         complete::{alpha1, alphanumeric1, char, digit1, line_ending, multispace1, space0, space1},
     },
-    combinator::{consumed, cut, eof, fail, map, not, opt, peek, recognize, rest, success, value},
+    combinator::{
+        consumed, cut, eof, fail, flat_map, map, not, opt, peek, recognize, rest, success, value,
+    },
     multi::{many0, many1},
     sequence::{delimited, preceded, separated_pair, terminated},
 };
@@ -74,11 +76,10 @@ fn read_token(input: Span) -> IResult<Span, Token> {
 }
 
 fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
-    alt((
-        |input| skip_empty_lines(input, has_left_spacing),
-        preceded(
-            char('!'),
-            alt((
+    flat_map(anychar, |c| {
+        move |rest| match c {
+            '\n' | '\r' => skip_empty_lines(input, has_left_spacing),
+            '!' => alt((
                 value(
                     Token::NotEq {
                         pos: Pos {
@@ -96,12 +97,10 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        |input| read_string_literal(input, has_left_spacing),
-        preceded(
-            char('#'),
-            alt((
+            ))
+            .parse(rest),
+            '\'' | '"' => read_string_literal(input, has_left_spacing),
+            '#' => alt((
                 value(
                     Token::Sharp3 {
                         pos: Pos {
@@ -129,61 +128,52 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        value(
-            Token::Percent {
+            ))
+            .parse(rest),
+            '%' => success(Token::Percent {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char('%'),
-        ),
-        value(
-            Token::And2 {
+            })
+            .parse(rest),
+            '&' => value(
+                Token::And2 {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
+                },
+                cut(char('&')),
+            )
+            .parse(rest),
+            '(' => success(Token::OpenParen {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            preceded(char('&'), cut(char('&'))),
-        ),
-        value(
-            Token::OpenParen {
+            })
+            .parse(rest),
+            ')' => success(Token::CloseParen {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char('('),
-        ),
-        value(
-            Token::CloseParen {
+            })
+            .parse(rest),
+            '*' => success(Token::Asterisk {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char(')'),
-        ),
-        value(
-            Token::Asterisk {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
-                },
-                has_left_spacing,
-            },
-            char('*'),
-        ),
-        preceded(
-            char('+'),
-            alt((
+            })
+            .parse(rest),
+            '+' => alt((
                 value(
                     Token::PlusEq {
                         pos: Pos {
@@ -201,21 +191,17 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        value(
-            Token::Comma {
+            ))
+            .parse(rest),
+            ',' => success(Token::Comma {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char(','),
-        ),
-        preceded(
-            char('-'),
-            alt((
+            })
+            .parse(rest),
+            '-' => alt((
                 value(
                     Token::MinusEq {
                         pos: Pos {
@@ -233,21 +219,17 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        value(
-            Token::Dot {
+            ))
+            .parse(rest),
+            '.' => success(Token::Dot {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char('.'),
-        ),
-        preceded(
-            char('/'),
-            alt((
+            })
+            .parse(rest),
+            '/' => alt((
                 preceded(
                     char('*'),
                     preceded(
@@ -269,11 +251,9 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        preceded(
-            char(':'),
-            alt((
+            ))
+            .parse(rest),
+            ':' => alt((
                 value(
                     Token::Colon2 {
                         pos: Pos {
@@ -291,21 +271,17 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        value(
-            Token::SemiColon {
+            ))
+            .parse(rest),
+            ';' => success(Token::SemiColon {
                 pos: Pos {
                     line: input.location_line(),
                     column: input.get_column(),
                 },
                 has_left_spacing,
-            },
-            char(';'),
-        ),
-        preceded(
-            char('<'),
-            alt((
+            })
+            .parse(rest),
+            '<' => alt((
                 value(
                     Token::LtEq {
                         pos: Pos {
@@ -333,11 +309,9 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        preceded(
-            char('='),
-            alt((
+            ))
+            .parse(rest),
+            '=' => alt((
                 value(
                     Token::Eq2 {
                         pos: Pos {
@@ -365,11 +339,9 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        preceded(
-            char('>'),
-            alt((
+            ))
+            .parse(rest),
+            '>' => alt((
                 value(
                     Token::GtEq {
                         pos: Pos {
@@ -387,116 +359,98 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                     },
                     has_left_spacing,
                 }),
-            )),
-        ),
-        alt((
-            value(
-                Token::Question {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+            ))
+            .parse(rest),
+            '?' => success(Token::Question {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('?'),
-            ),
-            value(
-                Token::At {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            '@' => success(Token::At {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('@'),
-            ),
-            value(
-                Token::OpenBracket {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            '[' => success(Token::OpenBracket {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('['),
-            ),
-            value(
-                Token::BackSlash {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            '\\' => success(Token::BackSlash {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('\\'),
-            ),
-            value(
-                Token::CloseBracket {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            ']' => success(Token::CloseBracket {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char(']'),
-            ),
-            value(
-                Token::Hat {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            '^' => success(Token::Hat {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('^'),
-            ),
-            |input| read_template(input, has_left_spacing),
-            value(
-                Token::OpenBrace {
-                    pos: Pos {
-                        line: input.location_line(),
-                        column: input.get_column(),
-                    },
-                    has_left_spacing,
+                has_left_spacing,
+            })
+            .parse(rest),
+            '`' => read_template(input, has_left_spacing),
+            '{' => success(Token::OpenBrace {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('{'),
-            ),
-            preceded(
-                char('|'),
-                alt((
-                    value(
-                        Token::Or2 {
-                            pos: Pos {
-                                line: input.location_line(),
-                                column: input.get_column(),
-                            },
-                            has_left_spacing,
-                        },
-                        char('|'),
-                    ),
-                    success(Token::Or {
+                has_left_spacing,
+            })
+            .parse(rest),
+            '|' => alt((
+                value(
+                    Token::Or2 {
                         pos: Pos {
                             line: input.location_line(),
                             column: input.get_column(),
                         },
                         has_left_spacing,
-                    }),
-                )),
-            ),
-            value(
-                Token::CloseBrace {
+                    },
+                    char('|'),
+                ),
+                success(Token::Or {
                     pos: Pos {
                         line: input.location_line(),
                         column: input.get_column(),
                     },
                     has_left_spacing,
+                }),
+            ))
+            .parse(rest),
+            '}' => success(Token::CloseBrace {
+                pos: Pos {
+                    line: input.location_line(),
+                    column: input.get_column(),
                 },
-                char('}'),
-            ),
-            |input| read_digits(input, has_left_spacing),
-            |input| read_word(input, has_left_spacing),
-        )),
-    ))
+                has_left_spacing,
+            })
+            .parse(rest),
+            c if c.is_ascii_digit() => read_digits(input, has_left_spacing),
+            c if c.is_ascii_alphabetic() || c == '_' => read_word(input, has_left_spacing),
+            _ => fail().parse(input),
+        }
+    })
     .parse(input)
 }
 
