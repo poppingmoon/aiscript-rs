@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use indexmap::IndexMap;
 
-use crate::node::{Elseif, Expression, QA, Statement, StatementOrExpression, StringOrExpression};
+use crate::node::{
+    Elseif, Expression, Obj, QA, Statement, StatementOrExpression, StringOrExpression,
+};
 
 use super::{
     scope::Scope,
@@ -132,7 +136,8 @@ pub enum Frame {
         str: String,
     },
     Obj {
-        obj: Box<IndexMap<String, Expression>>,
+        obj: Arc<Obj>,
+        index: usize,
         map: Box<IndexMap<String, Value>>,
         k: String,
     },

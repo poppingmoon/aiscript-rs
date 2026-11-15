@@ -479,12 +479,13 @@ impl Interpreter {
                         ast::Expression::Bool(bool) => value_stack.push(Value::bool(bool.value)),
                         ast::Expression::Null(_) => value_stack.push(Value::null()),
                         ast::Expression::Obj(obj) => {
-                            let mut obj = obj.value.clone();
-                            obj.reverse();
-                            if let Some((k, v)) = obj.pop() {
-                                let len = obj.len() + 1;
+                            if let Some((k, v)) = obj.value.first() {
+                                let k = k.clone();
+                                let v = v.clone();
+                                let len = obj.value.len();
                                 stack.push(Frame::Obj {
-                                    obj: obj.into(),
+                                    obj,
+                                    index: 1,
                                     map: IndexMap::with_capacity(len).into(),
                                     k,
                                 });
@@ -917,14 +918,22 @@ impl Interpreter {
                     }
                 }
                 Frame::Obj {
-                    mut obj,
+                    obj,
+                    index,
                     mut map,
                     k,
                 } => {
                     let v = value_stack.pop_value()?;
                     map.insert(k, v);
-                    if let Some((k, v)) = obj.pop() {
-                        stack.push(Frame::Obj { obj, map, k });
+                    if let Some((k, v)) = obj.value.get_index(index) {
+                        let k = k.clone();
+                        let v = v.clone();
+                        stack.push(Frame::Obj {
+                            obj,
+                            index: index + 1,
+                            map,
+                            k,
+                        });
                         stack.eval(v);
                     } else {
                         value_stack.push(Value::obj(*map));
