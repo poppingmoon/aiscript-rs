@@ -3,7 +3,7 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::node::{
-    Elseif, Expression, Obj, QA, Statement, StatementOrExpression, StringOrExpression,
+    Elseif, Expression, Loop, Obj, QA, Statement, StatementOrExpression, StringOrExpression,
 };
 
 use super::{
@@ -69,11 +69,8 @@ pub enum Frame {
         until: f64,
         for_: StatementOrExpression,
     },
-    Loop1 {
-        statements: Vec<StatementOrExpression>,
-    },
-    Loop2 {
-        statements: Vec<StatementOrExpression>,
+    Loop {
+        loop_: Arc<Loop>,
     },
     Assign1 {
         dest: Expression,

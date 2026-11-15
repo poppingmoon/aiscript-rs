@@ -304,7 +304,7 @@ impl Interpreter {
                 .collect();
                 async move {
                     self.run(
-                        fn_.statements.clone(),
+                        fn_.statements.iter().cloned(),
                         &(*fn_.scope).clone().create_child_scope(args),
                     )
                     .await
@@ -380,9 +380,13 @@ impl Interpreter {
                                 stack.eval(from.clone());
                             }
                         }
-                        ast::Statement::Loop(loop_) => stack.push(Frame::Loop1 {
-                            statements: loop_.statements.clone(),
-                        }),
+                        ast::Statement::Loop(loop_) => {
+                            stack.push(Frame::Loop {
+                                loop_: loop_.clone(),
+                            });
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.run(loop_.statements.iter().cloned());
+                        }
                         ast::Statement::Break(_) => value_stack.push(Value::break_()),
                         ast::Statement::Continue(_) => value_stack.push(Value::continue_()),
                         ast::Statement::Assign(assign) => {
@@ -683,20 +687,19 @@ impl Interpreter {
                         }),
                     }
                 }
-                Frame::Loop1 { statements } => {
-                    stack.push(Frame::Loop2 {
-                        statements: statements.clone(),
-                    });
-                    scope = scope.create_child_scope(HashMap::new());
-                    stack.run(statements);
-                }
-                Frame::Loop2 { statements } => {
+                Frame::Loop { loop_ } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
                     match v.value {
                         V::Break => value_stack.push(Value::null()),
                         V::Return(_) => value_stack.push(v),
-                        _ => stack.push(Frame::Loop1 { statements }),
+                        _ => {
+                            stack.push(Frame::Loop {
+                                loop_: loop_.clone(),
+                            });
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.run(loop_.statements.iter().cloned());
+                        }
                     }
                 }
                 Frame::Assign1 { dest } => {

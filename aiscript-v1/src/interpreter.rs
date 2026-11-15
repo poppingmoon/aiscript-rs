@@ -392,13 +392,11 @@ impl Interpreter {
                             stack.eval(from.clone());
                         }
                         ast::Statement::Loop(loop_) => {
-                            let ast::Loop {
-                                label, statements, ..
-                            } = &*loop_;
-                            stack.push(Frame::Loop1 {
-                                label: label.clone(),
-                                statements: statements.clone(),
-                            })
+                            stack.push(Frame::Loop {
+                                loop_: loop_.clone(),
+                            });
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.run(loop_.statements.iter().cloned());
                         }
                         ast::Statement::Break(break_) => {
                             let ast::Break { label, expr, .. } = &*break_;
@@ -1014,30 +1012,28 @@ impl Interpreter {
                         }),
                     }
                 }
-                Frame::Loop1 { label, statements } => {
-                    stack.push(Frame::Loop2 {
-                        label,
-                        statements: statements.clone(),
-                    });
-                    scope = scope.create_child_scope(HashMap::new());
-                    stack.run(statements);
-                }
-                Frame::Loop2 { label, statements } => {
+                Frame::Loop { loop_ } => {
                     scope = scope.get_parent()?;
                     let v = value_stack.pop_value()?;
                     match &v.value {
-                        V::Break { label: l, .. } => {
-                            value_stack.push(if l.is_some() && *l != label {
+                        V::Break { label, .. } => {
+                            value_stack.push(if label.is_some() && *label != loop_.label {
                                 v
                             } else {
                                 Value::null()
                             });
                         }
-                        V::Continue { label: l, .. } if l.is_some() && *l != label => {
+                        V::Continue { label, .. } if label.is_some() && *label != loop_.label => {
                             value_stack.push(v);
                         }
                         V::Return(_) => value_stack.push(v),
-                        _ => stack.push(Frame::Loop1 { label, statements }),
+                        _ => {
+                            stack.push(Frame::Loop {
+                                loop_: loop_.clone(),
+                            });
+                            scope = scope.create_child_scope(HashMap::new());
+                            stack.run(loop_.statements.iter().cloned());
+                        }
                     }
                 }
                 Frame::Break { label } => {

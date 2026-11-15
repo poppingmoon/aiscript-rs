@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::node::{Arr, Attribute, Elseif, Expression, Obj, QA, Statement, StatementOrExpression};
+use crate::node::{
+    Arr, Attribute, Elseif, Expression, Loop, Obj, QA, Statement, StatementOrExpression,
+};
 
 use super::{
     scope::Scope,
@@ -78,13 +80,8 @@ pub enum Frame {
         until: f64,
         for_: StatementOrExpression,
     },
-    Loop1 {
-        label: Option<String>,
-        statements: Vec<StatementOrExpression>,
-    },
-    Loop2 {
-        label: Option<String>,
-        statements: Vec<StatementOrExpression>,
+    Loop {
+        loop_: Arc<Loop>,
     },
     Break {
         label: Option<String>,
