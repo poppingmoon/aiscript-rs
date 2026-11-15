@@ -427,7 +427,12 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 has_left_spacing,
             })
             .parse(rest),
-            '`' => read_template(input, has_left_spacing),
+            '`' => read_template(
+                rest,
+                input.location_line(),
+                input.get_column(),
+                has_left_spacing,
+            ),
             '{' => success(Token::OpenBrace {
                 pos: Pos {
                     line: input.location_line(),
@@ -696,7 +701,12 @@ fn read_string_literal(
     .parse(input)
 }
 
-fn read_template(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
+fn read_template(
+    input: Span,
+    start_line: u32,
+    start_column: usize,
+    has_left_spacing: bool,
+) -> IResult<Span, Token> {
     fn template_expr(input: Span) -> IResult<Span, Vec<Token>> {
         map(
             many1(alt((
@@ -742,8 +752,7 @@ fn read_template(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
         .parse(input)
     }
 
-    delimited(
-        char('`'),
+    terminated(
         map(
             many0(alt((
                 map(
@@ -792,8 +801,8 @@ fn read_template(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
             ))),
             |children| Token::Template {
                 pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+                    line: start_line,
+                    column: start_column,
                 },
                 has_left_spacing,
                 children,
