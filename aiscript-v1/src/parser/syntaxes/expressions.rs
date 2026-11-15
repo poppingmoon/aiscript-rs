@@ -551,7 +551,7 @@ fn parse_atom(s: &mut Tokens) -> Result<ast::Expression, AiScriptSyntaxError> {
                     start: pos,
                     end: s.peek().pos().clone(),
                 },
-                value: value.concat(),
+                value: value.into_owned(),
             }
             .into(),
         ),
@@ -640,7 +640,7 @@ pub fn parse_static_expr(s: &mut Tokens) -> Result<ast::Expression, AiScriptSynt
                     start: pos,
                     end: s.peek().pos().clone(),
                 },
-                value: value.concat(),
+                value: value.into_owned(),
             }
             .into(),
         ),
@@ -1206,7 +1206,7 @@ fn parse_object(
 fn parse_object_key(s: &mut Tokens) -> Result<(String, ast::Pos, bool), AiScriptSyntaxError> {
     Ok(match s.pop_token() {
         Token::Identifier { pos, value, .. } => (value.to_string(), pos, true),
-        Token::StringLiteral { pos, value, .. } => (value.concat(), pos, false),
+        Token::StringLiteral { pos, value, .. } => (value.into_owned(), pos, false),
         Token::NullKeyword { pos, .. } => ("null".to_string(), pos, false),
         Token::TrueKeyword { pos, .. } => ("true".to_string(), pos, false),
         Token::FalseKeyword { pos, .. } => ("false".to_string(), pos, false),

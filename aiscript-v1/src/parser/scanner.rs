@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use nom::{
     IResult, Parser,
     branch::alt,
@@ -681,23 +683,39 @@ fn read_string_literal(
     start_column: usize,
     has_left_spacing: bool,
 ) -> IResult<Span, Token> {
-    map(
-        terminated(
-            many0(alt((
-                preceded(char::<Span, _>('\\'), cut(recognize(anychar))),
-                take_till1(|c| c == '\\' || c == literal_mark),
-            ))),
-            cut(char(literal_mark)),
-        ),
-        |value| Token::StringLiteral {
-            pos: Pos {
-                line: start_line,
-                column: start_column,
+    alt((
+        map(
+            terminated(
+                take_till(|c| c == '\\' || c == literal_mark),
+                char(literal_mark),
+            ),
+            |value: Span<'_>| Token::StringLiteral {
+                pos: Pos {
+                    line: start_line,
+                    column: start_column,
+                },
+                has_left_spacing,
+                value: Cow::Borrowed(value.into_fragment()),
             },
-            has_left_spacing,
-            value: value.into_iter().map(|s| s.into_fragment()).collect(),
-        },
-    )
+        ),
+        map(
+            terminated(
+                many0(alt((
+                    preceded(char::<Span, _>('\\'), cut(recognize(anychar))),
+                    take_till1(|c| c == '\\' || c == literal_mark),
+                ))),
+                cut(char(literal_mark)),
+            ),
+            |value| Token::StringLiteral {
+                pos: Pos {
+                    line: start_line,
+                    column: start_column,
+                },
+                has_left_spacing,
+                value: value.into_iter().map(|s| s.into_fragment()).collect(),
+            },
+        ),
+    ))
     .parse(input)
 }
 

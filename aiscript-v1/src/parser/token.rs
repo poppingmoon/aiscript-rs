@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::node::Pos;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,7 +27,7 @@ pub enum Token<'a> {
     StringLiteral {
         pos: Pos,
         has_left_spacing: bool,
-        value: Vec<&'a str>,
+        value: Cow<'a, str>,
     },
 
     // template string
