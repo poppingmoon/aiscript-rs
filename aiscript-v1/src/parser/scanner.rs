@@ -111,7 +111,13 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            '\'' | '"' => read_string_literal(input, has_left_spacing),
+            '\'' | '"' => read_string_literal(
+                rest,
+                c,
+                input.location_line(),
+                input.get_column(),
+                has_left_spacing,
+            ),
             '#' => alt((
                 value(
                     Token::Sharp3 {
@@ -663,42 +669,30 @@ fn read_digits(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
     .parse(input)
 }
 
-fn read_string_literal(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
-    fn read_string_literal(
-        input: Span,
-        has_left_spacing: bool,
-        literal_mark: char,
-    ) -> IResult<Span, Token> {
-        map(
-            terminated(
-                many0(alt((
-                    preceded(char::<Span, _>('\\'), cut(recognize(anychar))),
-                    take_till1(|c| c == '\\' || c == literal_mark),
-                ))),
-                cut(char(literal_mark)),
-            ),
-            |value| Token::StringLiteral {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
-                },
-                has_left_spacing,
-                value: value.into_iter().map(|s| s.into_fragment()).collect(),
+fn read_string_literal(
+    input: Span,
+    literal_mark: char,
+    start_line: u32,
+    start_column: usize,
+    has_left_spacing: bool,
+) -> IResult<Span, Token> {
+    map(
+        terminated(
+            many0(alt((
+                preceded(char::<Span, _>('\\'), cut(recognize(anychar))),
+                take_till1(|c| c == '\\' || c == literal_mark),
+            ))),
+            cut(char(literal_mark)),
+        ),
+        |value| Token::StringLiteral {
+            pos: Pos {
+                line: start_line,
+                column: start_column,
             },
-        )
-        .parse(input)
-    }
-
-    alt((
-        preceded(
-            char('\''),
-            cut(|input| read_string_literal(input, has_left_spacing, '\'')),
-        ),
-        preceded(
-            char('"'),
-            cut(|input| read_string_literal(input, has_left_spacing, '"')),
-        ),
-    ))
+            has_left_spacing,
+            value: value.into_iter().map(|s| s.into_fragment()).collect(),
+        },
+    )
     .parse(input)
 }
 
