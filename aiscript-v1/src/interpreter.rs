@@ -585,12 +585,12 @@ impl Interpreter {
                             }
                         }
                         ast::Expression::Arr(arr) => {
-                            let mut arr = arr.value.clone();
-                            arr.reverse();
-                            if let Some(v) = arr.pop() {
-                                let len = arr.len() + 1;
+                            if let Some(v) = arr.value.first() {
+                                let v = v.clone();
+                                let len = arr.value.len();
                                 stack.push(Frame::Arr {
                                     arr,
+                                    index: 1,
                                     value: Vec::with_capacity(len),
                                 });
                                 stack.eval(v);
@@ -1487,14 +1487,23 @@ impl Interpreter {
                         }
                     }
                 }
-                Frame::Arr { mut arr, mut value } => {
+                Frame::Arr {
+                    arr,
+                    index,
+                    mut value,
+                } => {
                     let v = value_stack.pop_value()?;
                     if v.is_control() {
                         value_stack.push(v);
                     } else {
                         value.push(v);
-                        if let Some(v) = arr.pop() {
-                            stack.push(Frame::Arr { arr, value });
+                        if let Some(v) = arr.value.get(index) {
+                            let v = v.clone();
+                            stack.push(Frame::Arr {
+                                arr,
+                                index: index + 1,
+                                value,
+                            });
                             stack.eval(v);
                         } else {
                             value_stack.push(Value::arr(value));

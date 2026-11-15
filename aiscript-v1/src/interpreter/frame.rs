@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use indexmap::IndexMap;
 
-use crate::node::{Attribute, Elseif, Expression, Obj, QA, Statement, StatementOrExpression};
+use crate::node::{Arr, Attribute, Elseif, Expression, Obj, QA, Statement, StatementOrExpression};
 
 use super::{
     scope::Scope,
@@ -177,7 +177,8 @@ pub enum Frame {
         k: String,
     },
     Arr {
-        arr: Vec<Expression>,
+        arr: Arc<Arr>,
+        index: usize,
         value: Vec<Value>,
     },
     Plus,
