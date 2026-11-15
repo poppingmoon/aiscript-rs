@@ -78,6 +78,8 @@ fn read_token(input: Span) -> IResult<Span, Token> {
 fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
     flat_map(anychar, |c| {
         move |rest| match c {
+            'A'..='Z' | 'a'..='z' | '_' => read_word(input, has_left_spacing),
+            '0'..='9' => read_digits(input, has_left_spacing),
             '\n' | '\r' => skip_empty_lines(input, has_left_spacing),
             '!' => alt((
                 value(
@@ -446,8 +448,6 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 has_left_spacing,
             })
             .parse(rest),
-            c if c.is_ascii_digit() => read_digits(input, has_left_spacing),
-            c if c.is_ascii_alphabetic() || c == '_' => read_word(input, has_left_spacing),
             _ => fail().parse(input),
         }
     })
