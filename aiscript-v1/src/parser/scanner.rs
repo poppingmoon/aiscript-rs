@@ -4,7 +4,7 @@ use nom::{
     bytes::complete::{tag, take_till, take_till1, take_until},
     character::{
         anychar,
-        complete::{alpha1, alphanumeric1, char, digit1, line_ending, multispace1, space0, space1},
+        complete::{alpha1, alphanumeric1, char, digit1, multispace1, space0, space1},
     },
     combinator::{
         consumed, cut, eof, fail, flat_map, map, not, opt, peek, recognize, rest, success, value,
@@ -80,7 +80,17 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
         move |rest| match c {
             'A'..='Z' | 'a'..='z' | '_' => read_word(input, has_left_spacing),
             '0'..='9' => read_digits(input, has_left_spacing),
-            '\n' | '\r' => skip_empty_lines(input, has_left_spacing),
+            '\n' | '\r' => value(
+                Token::NewLine {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
+                },
+                skip_empty_lines,
+            )
+            .parse(rest),
             '!' => alt((
                 value(
                     Token::NotEq {
@@ -800,28 +810,19 @@ fn read_template(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
     .parse(input)
 }
 
-fn skip_empty_lines(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
+fn skip_empty_lines(input: Span) -> IResult<Span, ()> {
     value(
-        Token::NewLine {
-            pos: Pos {
-                line: input.location_line(),
-                column: input.get_column(),
-            },
-            has_left_spacing,
-        },
-        preceded(
-            line_ending,
-            many0(alt((
-                multispace1,
-                recognize(preceded(
-                    char('/'),
-                    alt((
-                        preceded(char('*'), skip_comment_range),
-                        preceded(char('/'), skip_comment_line),
-                    )),
+        (),
+        many0(alt((
+            multispace1,
+            recognize(preceded(
+                char('/'),
+                alt((
+                    preceded(char('*'), skip_comment_range),
+                    preceded(char('/'), skip_comment_line),
                 )),
-            ))),
-        ),
+            )),
+        ))),
     )
     .parse(input)
 }
