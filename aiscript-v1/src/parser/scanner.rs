@@ -160,14 +160,16 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            '%' => success(Token::Percent {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '%' => Ok((
+                rest,
+                Token::Percent {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '&' => value(
                 Token::And2 {
                     pos: Pos {
@@ -179,30 +181,36 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 cut(char('&')),
             )
             .parse(rest),
-            '(' => success(Token::OpenParen {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '(' => Ok((
+                rest,
+                Token::OpenParen {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            ')' => success(Token::CloseParen {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            ')' => Ok((
+                rest,
+                Token::CloseParen {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            '*' => success(Token::Asterisk {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            '*' => Ok((
+                rest,
+                Token::Asterisk {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '+' => alt((
                 value(
                     Token::PlusEq {
@@ -223,14 +231,16 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            ',' => success(Token::Comma {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            ',' => Ok((
+                rest,
+                Token::Comma {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '-' => alt((
                 value(
                     Token::MinusEq {
@@ -251,14 +261,16 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            '.' => success(Token::Dot {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '.' => Ok((
+                rest,
+                Token::Dot {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '/' => alt((
                 preceded(
                     char('*'),
@@ -303,14 +315,16 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            ';' => success(Token::SemiColon {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            ';' => Ok((
+                rest,
+                Token::SemiColon {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '<' => alt((
                 value(
                     Token::LtEq {
@@ -391,68 +405,82 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            '?' => success(Token::Question {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '?' => Ok((
+                rest,
+                Token::Question {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            '@' => success(Token::At {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            '@' => Ok((
+                rest,
+                Token::At {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            '[' => success(Token::OpenBracket {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            '[' => Ok((
+                rest,
+                Token::OpenBracket {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            '\\' => success(Token::BackSlash {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            '\\' => Ok((
+                rest,
+                Token::BackSlash {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            ']' => success(Token::CloseBracket {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            ']' => Ok((
+                rest,
+                Token::CloseBracket {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
-            '^' => success(Token::Hat {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            )),
+            '^' => Ok((
+                rest,
+                Token::Hat {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '`' => read_template(
                 rest,
                 input.location_line(),
                 input.get_column(),
                 has_left_spacing,
             ),
-            '{' => success(Token::OpenBrace {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '{' => Ok((
+                rest,
+                Token::OpenBrace {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             '|' => alt((
                 value(
                     Token::Or2 {
@@ -473,14 +501,16 @@ fn read_token_no_space(input: Span, has_left_spacing: bool) -> IResult<Span, Tok
                 }),
             ))
             .parse(rest),
-            '}' => success(Token::CloseBrace {
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
+            '}' => Ok((
+                rest,
+                Token::CloseBrace {
+                    pos: Pos {
+                        line: input.location_line(),
+                        column: input.get_column(),
+                    },
+                    has_left_spacing,
                 },
-                has_left_spacing,
-            })
-            .parse(rest),
+            )),
             _ => fail().parse(input),
         }
     })
