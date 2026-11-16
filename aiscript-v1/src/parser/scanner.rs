@@ -11,7 +11,7 @@ use nom::{
     combinator::{
         consumed, cut, eof, fail, flat_map, map, not, opt, peek, recognize, rest, success, value,
     },
-    multi::{many0, many1},
+    multi::{fold_many0, many0, many1},
     sequence::{delimited, preceded, separated_pair, terminated},
 };
 use nom_locate::LocatedSpan;
@@ -27,46 +27,56 @@ type Span<'a> = LocatedSpan<&'a str>;
 
 pub fn read_tokens(input: &str) -> Result<Vec<Token<'_>>, AiScriptSyntaxError> {
     let input = Span::new(input);
-    terminated(many0(read_token), space0)
-        .parse(input)
-        .map_err(|e| match e {
-            nom::Err::Incomplete(_) => AiScriptSyntaxError {
-                kind: AiScriptSyntaxErrorKind::UnexpectedEof,
-                pos: Pos { line: 0, column: 0 },
+    terminated(
+        fold_many0(
+            read_token,
+            || Vec::with_capacity(input.len() / 2),
+            |mut acc, token| {
+                acc.push(token);
+                acc
             },
-            nom::Err::Error(nom::error::Error { input, .. })
-            | nom::Err::Failure(nom::error::Error { input, .. }) => AiScriptSyntaxError {
-                kind: if let Some(c) = input.chars().next() {
-                    AiScriptSyntaxErrorKind::InvalidCharacter(c)
-                } else {
-                    AiScriptSyntaxErrorKind::UnexpectedEof
-                },
-                pos: Pos {
-                    line: input.location_line(),
-                    column: input.get_column(),
-                },
+        ),
+        space0,
+    )
+    .parse(input)
+    .map_err(|e| match e {
+        nom::Err::Incomplete(_) => AiScriptSyntaxError {
+            kind: AiScriptSyntaxErrorKind::UnexpectedEof,
+            pos: Pos { line: 0, column: 0 },
+        },
+        nom::Err::Error(nom::error::Error { input, .. })
+        | nom::Err::Failure(nom::error::Error { input, .. }) => AiScriptSyntaxError {
+            kind: if let Some(c) = input.chars().next() {
+                AiScriptSyntaxErrorKind::InvalidCharacter(c)
+            } else {
+                AiScriptSyntaxErrorKind::UnexpectedEof
             },
-        })
-        .and_then(|(input, mut tokens)| {
-            let pos = Pos {
+            pos: Pos {
                 line: input.location_line(),
                 column: input.get_column(),
-            };
-            if let Some(c) = input.chars().next() {
-                Err(AiScriptSyntaxError {
-                    kind: AiScriptSyntaxErrorKind::InvalidCharacter(c),
+            },
+        },
+    })
+    .and_then(|(input, mut tokens)| {
+        let pos = Pos {
+            line: input.location_line(),
+            column: input.get_column(),
+        };
+        if let Some(c) = input.chars().next() {
+            Err(AiScriptSyntaxError {
+                kind: AiScriptSyntaxErrorKind::InvalidCharacter(c),
+                pos,
+            })
+        } else {
+            if !matches!(tokens.last(), Some(Token::Eof { .. })) {
+                tokens.push(Token::Eof {
                     pos,
-                })
-            } else {
-                if !matches!(tokens.last(), Some(Token::Eof { .. })) {
-                    tokens.push(Token::Eof {
-                        pos,
-                        has_left_spacing: false,
-                    });
-                }
-                Ok(tokens)
+                    has_left_spacing: false,
+                });
             }
-        })
+            Ok(tokens)
+        }
+    })
 }
 
 fn read_token(input: Span) -> IResult<Span, Token> {
