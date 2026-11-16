@@ -11,7 +11,7 @@ use nom::{
     combinator::{
         consumed, cut, eof, fail, flat_map, map, not, opt, peek, recognize, rest, success, value,
     },
-    multi::{fold_many0, many0, many1},
+    multi::{fold_many0, many0, many0_count, many1},
     sequence::{delimited, preceded, separated_pair, terminated},
 };
 use nom_locate::LocatedSpan;
@@ -844,7 +844,7 @@ fn read_template(
 fn skip_empty_lines(input: Span) -> IResult<Span, ()> {
     value(
         (),
-        many0(alt((
+        many0_count(alt((
             multispace1,
             recognize(preceded(
                 char('/'),
