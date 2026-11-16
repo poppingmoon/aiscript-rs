@@ -17,6 +17,7 @@ peg::parser! {
             = text:$(tmpl()) { text.to_string() }
             / text:$(str()) { text.to_string() }
             / comment()
+            / text:$( (!("//" / "/*") [^ '`' | '"' | '\''])+ ) { text.to_string() }
             / c:[_] { c.to_string() }
 
         rule comment() -> String
