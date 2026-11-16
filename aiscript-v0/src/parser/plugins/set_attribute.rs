@@ -16,19 +16,19 @@ pub fn set_attribute(
             }
             _ => {
                 if !statements.is_empty() {
-                    let mut nodes = set_attribute_statement_or_expression(statements.clone())?
-                        .into_iter()
-                        .map(Into::into)
-                        .collect::<Vec<cst::Node>>();
+                    let mut nodes =
+                        set_attribute_statement_or_expression(std::mem::take(&mut statements))?
+                            .into_iter()
+                            .map(Into::into)
+                            .collect::<Vec<cst::Node>>();
                     result.append(&mut nodes);
-                    statements.clear();
                 }
                 result.push(node);
             }
         };
     }
     if !statements.is_empty() {
-        let mut nodes = set_attribute_statement_or_expression(statements.clone())?
+        let mut nodes = set_attribute_statement_or_expression(statements)?
             .into_iter()
             .map(Into::into)
             .collect::<Vec<cst::Node>>();
