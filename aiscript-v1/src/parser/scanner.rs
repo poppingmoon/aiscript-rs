@@ -3,10 +3,10 @@ use std::borrow::Cow;
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{tag, take_till, take_till1, take_until},
+    bytes::complete::{tag, take_till, take_till1, take_until, take_while},
     character::{
         anychar,
-        complete::{alpha1, alphanumeric1, char, digit1, multispace1, space0, space1},
+        complete::{char, digit1, multispace1, space0, space1},
     },
     combinator::{
         consumed, cut, eof, fail, flat_map, map, not, opt, peek, recognize, rest, success, value,
@@ -503,11 +503,8 @@ fn read_eof(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
 
 fn read_word(input: Span, has_left_spacing: bool) -> IResult<Span, Token> {
     map(
-        recognize((
-            alt((alpha1::<Span, _>, tag("_"))),
-            many0(alt((alphanumeric1, tag("_")))),
-        )),
-        |value| match value.into_fragment() {
+        take_while(|c| matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_')),
+        |value: Span| match value.into_fragment() {
             "null" => Token::NullKeyword {
                 pos: Pos {
                     line: input.location_line(),
